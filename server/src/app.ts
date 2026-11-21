@@ -5,6 +5,7 @@ import compression from "compression";
 import { rateLimit } from "express-rate-limit";
 import type { Config } from "./config.js";
 import { AppError, errorHandler } from "./errors.js";
+import { airRouter } from "./airRoutes.js";
 
 export function createApp(config: Config): Express {
   const app = express();
@@ -44,6 +45,8 @@ export function createApp(config: Config): Express {
       uptimeSeconds: Math.floor(process.uptime()),
     });
   });
+
+  app.use("/api", airRouter);
 
   app.use((_req, _res, next) => {
     next(new AppError(404, "NOT_FOUND", "Route not found"));
