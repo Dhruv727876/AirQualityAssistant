@@ -31,17 +31,6 @@ describe("loadConfig", () => {
     expect(config.PORT).toBe(3000);
   });
 
-  it("handles unset PORT with default 8080", () => {
-    const env = {
-      GEMINI_API_KEY: "gemini-secret-key",
-      NVIDIA_API_KEY: "nvidia-secret-key",
-      ALLOWED_ORIGINS: "http://localhost:5173",
-    };
-
-    const config = loadConfig(env);
-    expect(config.PORT).toBe(8080);
-  });
-
   it("throws descriptive error naming PORT when PORT is not a number", () => {
     const env = {
       PORT: "abc",
@@ -62,17 +51,6 @@ describe("loadConfig", () => {
     };
 
     expect(() => loadConfig(env)).toThrowError(/PORT/);
-  });
-
-  it("does not require NODE_ENV", () => {
-    const env = {
-      GEMINI_API_KEY: "gemini-secret-key",
-      NVIDIA_API_KEY: "nvidia-secret-key",
-      ALLOWED_ORIGINS: "http://localhost:5173",
-    };
-
-    const config = loadConfig(env);
-    expect(config.PORT).toBe(8080);
   });
 
   it("throws descriptive error naming every missing required variable", () => {

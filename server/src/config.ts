@@ -30,16 +30,14 @@ const configSchema = z.object({
     }),
 });
 
-export type Config = z.infer<typeof configSchema> & {
-  NODE_ENV?: string;
-};
+export type Config = z.infer<typeof configSchema>;
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const result = configSchema.safeParse(env);
 
   if (!result.success) {
     const errorDetails = result.error.issues
-      .map((issue) => `${issue.path.join(".") || "config"}: ${issue.message}`)
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
       .join(", ");
     throw new Error(`Configuration error: ${errorDetails}`);
   }

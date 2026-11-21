@@ -6,7 +6,6 @@ import type { Config } from "./config.js";
 import { AppError, errorHandler } from "./errors.js";
 
 const testConfig: Config = {
-  NODE_ENV: "test",
   PORT: 8081,
   GEMINI_API_KEY: "test-gemini-key",
   NVIDIA_API_KEY: "test-nvidia-key",
