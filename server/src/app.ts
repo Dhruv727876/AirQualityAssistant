@@ -2,10 +2,14 @@ import express, { type Express } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
-import { rateLimit } from "express-rate-limit";
 import type { Config } from "./config.js";
 import { AppError, errorHandler } from "./errors.js";
 import { airRouter } from "./airRoutes.js";
+import { planRouter } from "./planRoutes.js";
+import { createLimiter } from "./rateLimit.js";
+
+const GENERAL_LIMIT = 100;
+const PLAN_LIMIT = 30;
 
 export function createApp(config: Config): Express {
   const app = express();
@@ -30,14 +34,7 @@ export function createApp(config: Config): Express {
   app.use(compression());
   app.use(express.json({ limit: "10kb" }));
 
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      limit: 100,
-      standardHeaders: "draft-7",
-      legacyHeaders: false,
-    })
-  );
+  app.use(createLimiter(GENERAL_LIMIT));
 
   app.get("/api/health", (_req, res) => {
     res.status(200).json({
@@ -47,6 +44,9 @@ export function createApp(config: Config): Express {
   });
 
   app.use("/api", airRouter);
+
+  app.use("/api/plan", createLimiter(PLAN_LIMIT));
+  app.use("/api", planRouter);
 
   app.use((_req, _res, next) => {
     next(new AppError(404, "NOT_FOUND", "Route not found"));

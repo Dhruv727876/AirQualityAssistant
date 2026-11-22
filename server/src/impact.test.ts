@@ -2,11 +2,75 @@ import { describe, it, expect } from "vitest";
 import {
   whoRatio,
   maskImpact,
+  wakingExtremes,
   timingImpact,
   purifierImpact,
   avoidCarTripsImpact,
 } from "./impact.js";
 import type { HourlyAir } from "./openMeteo.js";
+
+describe("wakingExtremes", () => {
+  it.each([
+    {
+      name: "identifies lowest and highest waking hours including time strings",
+      hourly: [
+        { time: "2026-01-01T04:00", usAqi: 20, pm25: 5 },
+        { time: "2026-01-01T08:00", usAqi: 60, pm25: 25 },
+        { time: "2026-01-01T12:00", usAqi: 150, pm25: 60 },
+        { time: "2026-01-01T15:00", usAqi: 40, pm25: 15 },
+        { time: "2026-01-01T22:00", usAqi: 10, pm25: 2 },
+      ],
+      expectedBestTime: "2026-01-01T15:00",
+      expectedBestPm25: 15,
+      expectedWorstTime: "2026-01-01T12:00",
+      expectedWorstPm25: 60,
+    },
+    {
+      name: "keeps first entry on ties",
+      hourly: [
+        { time: "2026-01-01T08:00", usAqi: 50, pm25: 20 },
+        { time: "2026-01-01T10:00", usAqi: 50, pm25: 20 },
+        { time: "2026-01-01T14:00", usAqi: 100, pm25: 50 },
+        { time: "2026-01-01T16:00", usAqi: 100, pm25: 50 },
+      ],
+      expectedBestTime: "2026-01-01T08:00",
+      expectedBestPm25: 20,
+      expectedWorstTime: "2026-01-01T14:00",
+      expectedWorstPm25: 50,
+    },
+  ])(
+    "$name",
+    ({ hourly, expectedBestTime, expectedBestPm25, expectedWorstTime, expectedWorstPm25 }) => {
+      const result = wakingExtremes(hourly);
+      expect(result).not.toBeNull();
+      expect(result?.best.time).toBe(expectedBestTime);
+      expect(result?.best.pm25).toBe(expectedBestPm25);
+      expect(result?.worst.time).toBe(expectedWorstTime);
+      expect(result?.worst.pm25).toBe(expectedWorstPm25);
+    }
+  );
+
+  it.each([
+    { name: "empty list", hourly: [] },
+    { name: "only one waking entry", hourly: [{ time: "2026-01-01T10:00", usAqi: 50, pm25: 20 }] },
+    {
+      name: "only entries outside waking window",
+      hourly: [
+        { time: "2026-01-01T02:00", usAqi: 50, pm25: 20 },
+        { time: "2026-01-01T23:00", usAqi: 60, pm25: 25 },
+      ],
+    },
+    {
+      name: "entries with null pm25",
+      hourly: [
+        { time: "2026-01-01T10:00", usAqi: null, pm25: null },
+        { time: "2026-01-01T12:00", usAqi: 50, pm25: 20 },
+      ],
+    },
+  ])("returns null when fewer than 2 qualify: $name", ({ hourly }) => {
+    expect(wakingExtremes(hourly)).toBeNull();
+  });
+});
 
 describe("whoRatio", () => {
   it.each([

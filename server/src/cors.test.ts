@@ -38,4 +38,16 @@ describe("CORS behavior", () => {
     expect(response.status).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
   });
+
+  it("handles OPTIONS preflight to /api/plan with allowed origin", async () => {
+    const app = createApp(testConfig);
+    const response = await request(app)
+      .options("/api/plan")
+      .set("Origin", "http://localhost:5173")
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "content-type");
+
+    expect(response.status).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+  });
 });

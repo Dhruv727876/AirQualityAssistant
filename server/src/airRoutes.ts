@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { AppError } from "./errors.js";
-import { searchPlaces, getAirQuality } from "./openMeteo.js";
+import { validateInput } from "./errors.js";
+import { searchPlaces } from "./openMeteo.js";
+import { loadAir } from "./airData.js";
 
 const geocodeQuerySchema = z.object({
   q: z
@@ -23,25 +24,16 @@ const airQuerySchema = z.object({
   lon: coordinate(180),
 });
 
-function parseQuery<T>(schema: z.ZodType<T>, query: unknown): T {
-  const result = schema.safeParse(query);
-  if (!result.success) {
-    const fields = result.error.issues.map((issue) => issue.path.join(".")).join(", ");
-    throw new AppError(400, "INVALID_INPUT", `Invalid query parameter: ${fields}`);
-  }
-  return result.data;
-}
-
 export const airRouter = Router();
 
 airRouter.get("/geocode", async (req, res) => {
-  const { q } = parseQuery(geocodeQuerySchema, req.query);
+  const { q } = validateInput(geocodeQuerySchema, req.query);
   const data = await searchPlaces(q);
   res.status(200).json(data);
 });
 
 airRouter.get("/air", async (req, res) => {
-  const { lat, lon } = parseQuery(airQuerySchema, req.query);
-  const data = await getAirQuality(lat, lon);
+  const { lat, lon } = validateInput(airQuerySchema, req.query);
+  const data = await loadAir(lat, lon);
   res.status(200).json(data);
 });

@@ -1,21 +1,27 @@
 import type { HourlyAir } from "./openMeteo.js";
 
-type Basis = "standard" | "forecast" | "arithmetic" | "rough estimate";
+export type Basis = "standard" | "forecast" | "arithmetic" | "rough estimate";
 
-type Lever =
+export type Lever =
   | "n95-outdoors"
   | "shift-outdoor-activity"
   | "ventilate-at-low-hour"
   | "air-purifier"
   | "avoid-car-trips";
 
-interface Impact {
+export interface Impact {
   lever: Lever;
   value: number;
   unit: string;
   basis: Basis;
   source?: string;
   assumptions: string[];
+}
+
+export interface HourReading {
+  time: string;
+  hour: number;
+  pm25: number;
 }
 
 const COEFFICIENTS: {
@@ -34,7 +40,7 @@ const COEFFICIENTS: {
   },
   whoPm25Guideline24h: {
     value: 15,
-    source: "WHO global air quality guidelines, 2021 (24-hour mean)",
+    source: "WHO global air quality guidelines, 2021 (24-hour guideline level)",
   },
   // Rough estimates with no citable source (see README)
   ceilingHeightM: {
@@ -52,8 +58,44 @@ const COEFFICIENTS: {
   },
 };
 
-function formatHour(hour: number): string {
+export function formatHour(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
+}
+
+export function wakingExtremes(
+  hourly: HourlyAir[]
+): { best: HourReading; worst: HourReading } | null {
+  const waking = COEFFICIENTS.wakingHours;
+  const qualifying: HourReading[] = [];
+
+  for (const entry of hourly) {
+    if (entry.pm25 === null) {
+      continue;
+    }
+    const hour = Number(entry.time.slice(11, 13));
+    if (hour >= waking.start && hour <= waking.end) {
+      qualifying.push({ time: entry.time, hour, pm25: entry.pm25 });
+    }
+  }
+
+  if (qualifying.length < 2) {
+    return null;
+  }
+
+  let best = qualifying[0];
+  let worst = qualifying[0];
+
+  for (let i = 1; i < qualifying.length; i++) {
+    const item = qualifying[i];
+    if (item.pm25 < best.pm25) {
+      best = item;
+    }
+    if (item.pm25 > worst.pm25) {
+      worst = item;
+    }
+  }
+
+  return { best, worst };
 }
 
 export function whoRatio(pm25: number | null): number | null {
@@ -78,41 +120,18 @@ export function timingImpact(
   lever: "shift-outdoor-activity" | "ventilate-at-low-hour",
   hourly: HourlyAir[]
 ): Impact | null {
-  const waking = COEFFICIENTS.wakingHours;
-  const qualifying: { hour: number; pm25: number }[] = [];
-
-  for (const entry of hourly) {
-    if (entry.pm25 === null) {
-      continue;
-    }
-    const hour = Number(entry.time.slice(11, 13));
-    if (hour >= waking.start && hour <= waking.end) {
-      qualifying.push({ hour, pm25: entry.pm25 });
-    }
-  }
-
-  if (qualifying.length < 2) {
+  const extremes = wakingExtremes(hourly);
+  if (!extremes) {
     return null;
   }
 
-  let best = qualifying[0];
-  let worst = qualifying[0];
-
-  for (let i = 1; i < qualifying.length; i++) {
-    const item = qualifying[i];
-    if (item.pm25 < best.pm25) {
-      best = item;
-    }
-    if (item.pm25 > worst.pm25) {
-      worst = item;
-    }
-  }
-
+  const { best, worst } = extremes;
   if (worst.pm25 === 0) {
     return null;
   }
 
   const value = Math.round((1 - best.pm25 / worst.pm25) * 100);
+  const waking = COEFFICIENTS.wakingHours;
 
   return {
     lever,

@@ -1,15 +1,41 @@
 import type { Request, Response, NextFunction } from "express";
+import type { ZodType } from "zod";
+
+export type ErrorCode =
+  | "INTERNAL"
+  | "BAD_REQUEST"
+  | "PAYLOAD_TOO_LARGE"
+  | "NOT_FOUND"
+  | "INVALID_INPUT"
+  | "UPSTREAM_ERROR"
+  | "RATE_LIMITED";
 
 export class AppError extends Error {
   readonly status: number;
-  readonly code: string;
+  readonly code: ErrorCode | string;
 
-  constructor(status: number, code: string, message?: string) {
+  constructor(status: number, code: ErrorCode | string, message?: string) {
     super(message ?? code);
     this.name = "AppError";
     this.status = status;
     this.code = code;
   }
+}
+
+export function validateInput<T>(schema: ZodType<T>, data: unknown): T {
+  const result = schema.safeParse(data);
+  if (!result.success) {
+    const fields = result.error.issues
+      .map((issue) => issue.path.join("."))
+      .filter(Boolean)
+      .join(", ");
+    throw new AppError(
+      400,
+      "INVALID_INPUT",
+      fields ? `Invalid input: ${fields}` : "Invalid input"
+    );
+  }
+  return result.data;
 }
 
 function sendError(res: Response, status: number, code: string, message: string): void {

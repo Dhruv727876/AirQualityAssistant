@@ -38,11 +38,38 @@ The application enforces a strict deterministic design rule: the LLM never produ
 | `air-purifier` | % lower indoor PM2.5 than the same room without it (steady state) | rough estimate | none |
 | `avoid-car-trips` | private-vehicle km avoided per week | arithmetic | none |
 
-The WHO ratio is the PM2.5 reading divided by 15 µg/m³, the 24-hour mean guideline from "WHO global air quality guidelines, 2021" (basis: standard). The guideline is a 24-hour mean while the app compares it to a single hourly reading, so the ratio is indicative only.
+The WHO ratio is the PM2.5 reading divided by 15 µg/m³, the 24-hour guideline level from "WHO global air quality guidelines, 2021" (defined by WHO as the 99th percentile of daily means, i.e. exceeded on at most 3-4 days a year; basis: standard). The app compares it to a single hourly reading, so the ratio is indicative only.
 
 Heating and cooking fuel swaps are not quantified in this model. All figures are estimates, not medical advice.
 
-The three physical constants used in the indoor air purifier model (ceiling height of 2.5 m, natural room air change rate of 0.5 per hour, and particle deposition rate of 0.2 per hour) are rough estimates with no source.
+The three physical constants used in the indoor air purifier model (ceiling height of 2.5 m, natural room air change rate of 0.5 per hour, and particle deposition rate of 0.2 per hour) are rough estimates with no source. The 06:00–21:00 waking window is also a rough estimate.
+
+## Verdict
+
+The plan builder assigns an actionable day verdict based on live US AQI and the profile's sensitivity. The EPA category boundaries (0–50, 51–100, 101–150, 151+) are published, while the stricter thresholds for sensitive profiles are this app's own conservative choice, not a published rule.
+
+| US AQI Range | General (Not Sensitive) | Sensitive / Community | EPA AQI Category |
+| --- | --- | --- | --- |
+| 0 – 50 | `go` | `go` | Good |
+| 51 – 100 | `go` | `caution` | Moderate |
+| 101 – 150 | `caution` | `limit-outdoors` | Unhealthy for Sensitive Groups |
+| 151 – 200 | `limit-outdoors` | `limit-outdoors` | Unhealthy |
+| 201 – 300 | `limit-outdoors` | `limit-outdoors` | Very Unhealthy |
+| 301+ | `limit-outdoors` | `limit-outdoors` | Hazardous |
+
+If live air data is missing (`usAqi` is null), the verdict defaults to `unknown` ("Live air data is incomplete for this hour; plan cautiously.").
+
+### Sensitive threshold rules
+The thresholds for sensitive profiles are intentionally more conservative than standard EPA category boundaries:
+- For general populations, precautions begin when air quality reaches "Unhealthy for Sensitive Groups" (AQI > 100).
+- For sensitive populations, precautions begin at AQI > 50 ("Moderate"), shifting the verdict from `go` to `caution`, and escalate to `limit-outdoors` at AQI > 100 rather than waiting for AQI > 150 ("Unhealthy").
+- A family profile is treated as sensitive if it reports any children (`children > 0`), older adults (`elderly > 0`), or flags `hasSensitiveMember: true`.
+
+### Community mode rules
+Community profiles are always evaluated under the sensitive thresholds regardless of individual member flags. In a community context, shared spaces and group activities may include individuals with respiratory vulnerabilities, young children, or elderly residents.
+
+### Household aggregation
+Only the commute impact is multiplied by the number of households; every other figure describes one typical household.
 
 ## Run locally
 
@@ -109,3 +136,5 @@ The three physical constants used in the indoor air purifier model (ceiling heig
 - **No database in v1 - profile state stays in localStorage**: Eliminates operational overhead and external state dependencies for the initial baseline while keeping user profiles local, private, and immediately responsive.
 - **Upstream bodies are zod-validated at the boundary and upstream errors are mapped to one 502 code**: External service boundaries are treated as untrusted; upstream schemas validate response structures immediately, and any network, timeout, or schema failure is mapped to a unified `UPSTREAM_ERROR` (502).
 - **The server never forwards upstream text**: Internal upstream error messages, raw network traces, and third-party error bodies are never relayed to clients, preventing information disclosure.
+- **Dedicated rate limit for /api/plan**: POST /api/plan has its own stricter rate limit (30 per 15 minutes per IP versus 100 for everything) because it is the endpoint that will call paid LLM APIs; both limits answer 429 in the standard error envelope.
+- **Privacy for household profile data**: The household profile is personal data: it is validated strictly, never logged, never echoed back in error messages, and only held in the browser's localStorage.
