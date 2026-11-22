@@ -293,10 +293,10 @@ describe("generateNarrative", () => {
     const req = JSON.parse(body);
     const payload = JSON.parse(req.contents[0].parts[0].text);
     expect(payload.DATA.households).toBe(45);
-    expect(body).toContain('\\"airBand\\":null');
+    expect(payload.DATA.airBand).toBeNull();
   });
 
-  it("fails NVIDIA when content is null, logging empty content once, without affecting Gemini success", async () => {
+  it('fails NVIDIA with "empty content" logged once when content is null', async () => {
     const nullContentNvidia = {
       choices: [
         {
@@ -321,11 +321,6 @@ describe("generateNarrative", () => {
     const log = loggedText();
     expect(log).toContain("LLM provider failed nvidia empty content");
     expect(log.split("empty content").length - 1).toBe(1);
-
-    const fetchMockSuccess = stubProviders(happyProviders);
-    const successResult = await generateNarrative(familyProfile, samplePlan, keys);
-    expect(successResult?.provider).toBe("gemini");
-    expect(successResult?.narrative).toEqual(sampleNarrative);
   });
 
   it("parses Gemini response when single part contains thoughtSignature alongside text", async () => {

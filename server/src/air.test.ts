@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import type { Config } from "./config.js";
@@ -10,6 +10,18 @@ const testConfig: Config = {
   NVIDIA_API_KEY: "test-nvidia-key",
   ALLOWED_ORIGINS: ["http://localhost:5173"],
 };
+
+function makeJsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("aqiBand", () => {
   it("maps boundary values to EPA AQI bands accurately", () => {
@@ -29,35 +41,22 @@ describe("aqiBand", () => {
 });
 
 describe("GET /api/geocode", () => {
-  const originalFetch = globalThis.fetch;
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
   it("maps fields and encodes query parameter in upstream URL", async () => {
     const mockFetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          results: [
-            {
-              id: 1,
-              name: "Delhi",
-              latitude: 28.65,
-              longitude: 77.23,
-              country: "India",
-              admin1: "National Capital Territory of Delhi",
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )
+      makeJsonResponse({
+        results: [
+          {
+            id: 1,
+            name: "Delhi",
+            latitude: 28.65,
+            longitude: 77.23,
+            country: "India",
+            admin1: "National Capital Territory of Delhi",
+          },
+        ],
+      })
     );
-    globalThis.fetch = mockFetch;
+    vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);
     const response = await request(app).get("/api/geocode?q=Delhi");
@@ -81,11 +80,9 @@ describe("GET /api/geocode", () => {
   });
 
   it("returns empty results array when upstream omits results key", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ generationtime_ms: 0.1 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(makeJsonResponse({ generationtime_ms: 0.1 }))
     );
 
     const app = createApp(testConfig);
@@ -97,7 +94,7 @@ describe("GET /api/geocode", () => {
 
   it("returns 400 and avoids upstream call when q is too short", async () => {
     const mockFetch = vi.fn();
-    globalThis.fetch = mockFetch;
+    vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);
     const response = await request(app).get("/api/geocode?q=a");
@@ -110,16 +107,6 @@ describe("GET /api/geocode", () => {
 });
 
 describe("GET /api/air", () => {
-  const originalFetch = globalThis.fetch;
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
   it("maps current air, band, and exactly the next 24 hourly entries", async () => {
     const times: string[] = [];
     const aqiList: number[] = [];
@@ -127,15 +114,17 @@ describe("GET /api/air", () => {
 
     // Generate 30 hourly timestamps: 2 past entries and 28 future entries
     for (let i = 0; i < 30; i++) {
-      const hourStr = String(i).padStart(2, "0");
-      times.push(`2026-01-01T${hourStr}:00`);
+      const day = i < 24 ? "01" : "02";
+      const hour = String(i % 24).padStart(2, "0");
+      times.push(`2026-01-${day}T${hour}:00`);
       aqiList.push(50 + i);
       pm25List.push(10.5 + i);
     }
 
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        makeJsonResponse({
           current: {
             time: "2026-01-01T02:00",
             us_aqi: 55,
@@ -147,8 +136,7 @@ describe("GET /api/air", () => {
             us_aqi: aqiList,
             pm2_5: pm25List,
           },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        })
       )
     );
 
@@ -174,7 +162,7 @@ describe("GET /api/air", () => {
 
   it("returns 400 and avoids upstream call when lat is out of range", async () => {
     const mockFetch = vi.fn();
-    globalThis.fetch = mockFetch;
+    vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);
     const response = await request(app).get("/api/air?lat=91&lon=0");
@@ -185,64 +173,48 @@ describe("GET /api/air", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("returns 400 and avoids upstream call when coordinates are blank or whitespace-only", async () => {
-    const mockFetch = vi.fn();
-    globalThis.fetch = mockFetch;
+  it.each([
+    { query: "lat=&lon=0", errorField: "lat" },
+    { query: "lat=%20%20&lon=0", errorField: "lat" },
+    { query: "lat=0&lon=", errorField: "lon" },
+    { query: "lat=0&lon=%20%20", errorField: "lon" },
+    { query: "lat=&lon=", errorField: undefined },
+    { query: "lat=abc&lon=0", errorField: "lat" },
+  ])(
+    "returns 400 and avoids upstream call when coordinates are invalid: $query",
+    async ({ query, errorField }) => {
+      const mockFetch = vi.fn();
+      vi.stubGlobal("fetch", mockFetch);
 
-    const app = createApp(testConfig);
+      const app = createApp(testConfig);
+      const response = await request(app).get(`/api/air?${query}`);
 
-    const emptyLatRes = await request(app).get("/api/air?lat=&lon=0");
-    expect(emptyLatRes.status).toBe(400);
-    expect(emptyLatRes.body.error.code).toBe("INVALID_INPUT");
-    expect(emptyLatRes.body.error.message).toContain("lat");
-
-    const whitespaceLatRes = await request(app).get("/api/air?lat=%20%20&lon=0");
-    expect(whitespaceLatRes.status).toBe(400);
-    expect(whitespaceLatRes.body.error.code).toBe("INVALID_INPUT");
-    expect(whitespaceLatRes.body.error.message).toContain("lat");
-
-    const emptyLonRes = await request(app).get("/api/air?lat=0&lon=");
-    expect(emptyLonRes.status).toBe(400);
-    expect(emptyLonRes.body.error.code).toBe("INVALID_INPUT");
-    expect(emptyLonRes.body.error.message).toContain("lon");
-
-    const whitespaceLonRes = await request(app).get("/api/air?lat=0&lon=%20%20");
-    expect(whitespaceLonRes.status).toBe(400);
-    expect(whitespaceLonRes.body.error.code).toBe("INVALID_INPUT");
-    expect(whitespaceLonRes.body.error.message).toContain("lon");
-
-    const emptyBothRes = await request(app).get("/api/air?lat=&lon=");
-    expect(emptyBothRes.status).toBe(400);
-    expect(emptyBothRes.body.error.code).toBe("INVALID_INPUT");
-
-    const nonNumericRes = await request(app).get("/api/air?lat=abc&lon=0");
-    expect(nonNumericRes.status).toBe(400);
-    expect(nonNumericRes.body.error.code).toBe("INVALID_INPUT");
-    expect(nonNumericRes.body.error.message).toContain("lat");
-
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe("INVALID_INPUT");
+      if (errorField) {
+        expect(response.body.error.message).toContain(errorField);
+      }
+      expect(mockFetch).not.toHaveBeenCalled();
+    }
+  );
 
   it("accepts explicit string '0' for coordinates", async () => {
     const mockFetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          current: {
-            time: "2026-01-01T00:00",
-            us_aqi: 20,
-            pm2_5: 5.0,
-            pm10: 10.0,
-          },
-          hourly: {
-            time: ["2026-01-01T00:00"],
-            us_aqi: [20],
-            pm2_5: [5.0],
-          },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )
+      makeJsonResponse({
+        current: {
+          time: "2026-01-01T00:00",
+          us_aqi: 20,
+          pm2_5: 5.0,
+          pm10: 10.0,
+        },
+        hourly: {
+          time: ["2026-01-01T00:00"],
+          us_aqi: [20],
+          pm2_5: [5.0],
+        },
+      })
     );
-    globalThis.fetch = mockFetch;
+    vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);
     const response = await request(app).get("/api/air?lat=0&lon=0");
@@ -255,9 +227,10 @@ describe("GET /api/air", () => {
   });
 
   it("preserves null pollutant values and sets band to null when usAqi is null", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        makeJsonResponse({
           current: {
             time: "2026-01-01T00:00",
             us_aqi: null,
@@ -269,8 +242,7 @@ describe("GET /api/air", () => {
             us_aqi: [null],
             pm2_5: [null],
           },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        })
       )
     );
 
@@ -296,23 +268,16 @@ describe("GET /api/air", () => {
 });
 
 describe("Upstream failure handling", () => {
-  const originalFetch = globalThis.fetch;
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-  });
-
   it("maps upstream non-2xx response to 502 UPSTREAM_ERROR without leaking upstream text", async () => {
     const upstreamErrorPayload = "Internal server disaster at Open-Meteo";
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(upstreamErrorPayload, {
-        status: 500,
-        statusText: "Internal Server Error",
-      })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(upstreamErrorPayload, {
+          status: 500,
+          statusText: "Internal Server Error",
+        })
+      )
     );
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -331,11 +296,11 @@ describe("Upstream failure handling", () => {
   });
 
   it("maps upstream schema validation failure to 502 UPSTREAM_ERROR", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ unexpected: "corrupted response structure" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        makeJsonResponse({ unexpected: "corrupted response structure" })
+      )
     );
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -354,7 +319,7 @@ describe("Upstream failure handling", () => {
 
   it("maps network timeout or rejection to 502 UPSTREAM_ERROR without leaking error details", async () => {
     const timeoutError = new Error("Connection timed out after 5000ms");
-    globalThis.fetch = vi.fn().mockRejectedValue(timeoutError);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeoutError));
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createApp(testConfig);

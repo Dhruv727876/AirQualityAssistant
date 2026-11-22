@@ -24,7 +24,7 @@ The application separates the frontend and backend into two decoupled tiers. Thi
 The application integrates with Open-Meteo for location search and live environmental metrics:
 - **Open-Meteo Geocoding API**: Resolves location queries into geographic coordinates with administrative regions.
 - **Open-Meteo Air Quality API**: Supplies atmospheric pollutant readings (`pm2_5`, `pm10`, and `us_aqi`). Air quality data is modelled data on a coarse grid (Copernicus Atmosphere Monitoring Service - CAMS via Open-Meteo), not street-level sensor readings. The `us_aqi` value is Open-Meteo's computation of the US EPA Air Quality Index based on standard EPA AQI category definitions.
-- **Attribution**: Air quality and weather data by Open-Meteo.com (licensed under CC BY 4.0).
+- **Attribution**: Air quality and weather data by [Open-Meteo.com](https://open-meteo.com) (licensed under CC BY 4.0).
 
 ## Impact model
 
@@ -79,7 +79,7 @@ Only the commute impact is multiplied by the number of households; every other f
 - **Privacy by design**: Only the location name, household composition (member counts, or the number of households), commute mode, heating and cooking type, whether a sensitive member is present, the air quality band label, the verdict level and the titles of the plan's actions are sent. Coordinates are never sent. The profile is never logged.
 - **Prompt injection defence**: Untrusted input is encapsulated strictly inside a data payload; output is schema-validated and length-capped; clients must render it as text, never as HTML.
 - **Latency & timeouts**: Responses are validated in full before display. The worst case is the air data call (5 s timeout) plus two 8-second provider timeouts, then the static plan.
-- **Trade-off on precision**: Rejecting digits means the wording can't include times or amounts, which is accepted so the numbers can only come from the server. The wording is checked for shape, length and digits, not for consistency with the verdict. The verdict and actions come from the server and stay the source of truth.
+- **Trade-off on precision**: Rejecting digits means the wording can't include times or amounts, which is accepted so the numbers can only come from the server. The wording is checked for shape, length and digits, not for consistency with the verdict. The verdict and actions come from the server and stay the source of truth. Known limits: the wording is not checked against the plan or the household's real situation. In live testing some outputs advised keeping windows closed while cooking on gas, some suggested opening windows when the air was very unhealthy, and community wording read like household wording.
 
 ## Run locally
 

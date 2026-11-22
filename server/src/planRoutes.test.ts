@@ -59,8 +59,11 @@ function stubFetch(options?: StubFetchOptions) {
     )
   );
 
-  const llmMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("open-meteo.com")) {
+      return openMeteoMock(input, init);
+    }
     if (llmResponse) {
       return Promise.resolve(llmResponse(url));
     }
@@ -70,14 +73,6 @@ function stubFetch(options?: StubFetchOptions) {
         headers: { "Content-Type": "application/json" },
       })
     );
-  });
-
-  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("open-meteo.com")) {
-      return openMeteoMock(input, init);
-    }
-    return llmMock(input, init);
   });
 
   return openMeteoMock;
@@ -227,7 +222,6 @@ describe("POST /api/plan", () => {
 
     const app = createApp(testConfig);
 
-    // Call stubFetch() (LLM failing) and POST the family profile. Keep that body as staticBody.
     stubFetch();
     const staticResponse = await request(app)
       .post("/api/plan")
@@ -235,7 +229,6 @@ describe("POST /api/plan", () => {
     expect(staticResponse.status).toBe(200);
     const staticBody = staticResponse.body;
 
-    // Call stubFetch({ llmResponse }) with a successful Gemini response and POST the same profile.
     stubFetch({
       llmResponse: () =>
         new Response(
