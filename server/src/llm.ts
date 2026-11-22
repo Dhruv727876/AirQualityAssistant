@@ -4,7 +4,7 @@ import type { Plan, GeneratedBy } from "./plan.js";
 import { parseNarrative, type Narrative } from "./narrative.js";
 import type { Config } from "./config.js";
 
-const GEMINI_MODEL = "gemini-3-flash-preview";
+const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
 const TIMEOUT_MS = 8000;
 
@@ -53,7 +53,7 @@ const nvidiaResponseSchema = z.object({
   choices: z.array(
     z.object({
       message: z.object({
-        content: z.string(),
+        content: z.string().nullable(),
       }),
     })
   ),
@@ -104,18 +104,23 @@ async function callNvidia(userMessage: string, apiKey: string): Promise<string> 
       ],
       temperature: 0.4,
       max_tokens: 800,
+      // This model reasons by default and can spend the whole token budget on reasoning, returning null content. Measured: without this flag, content was null.
+      chat_template_kwargs: { enable_thinking: false },
     }
   );
 
   const parsed = nvidiaResponseSchema.safeParse(data);
-  const text = parsed.success
+  const content = parsed.success
     ? parsed.data.choices.at(0)?.message.content
     : undefined;
-  if (text === undefined) {
+  if (content === null) {
+    throw new Error("empty content");
+  }
+  if (content === undefined) {
     throw new Error("unexpected response shape");
   }
 
-  return text;
+  return content;
 }
 
 type ProviderName = Exclude<GeneratedBy, "static">;

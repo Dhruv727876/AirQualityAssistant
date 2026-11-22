@@ -132,6 +132,11 @@ function makeNvidiaSuccess(narrative: unknown = sampleNarrative) {
   };
 }
 
+const happyProviders = {
+  gemini: () => makeJsonResponse(makeGeminiSuccess()),
+  nvidia: () => makeJsonResponse(makeNvidiaSuccess()),
+};
+
 function extractHeaders(init?: RequestInit): Record<string, string> {
   return Object.fromEntries(new Headers(init?.headers));
 }
@@ -159,10 +164,7 @@ describe("generateNarrative", () => {
   });
 
   it("returns provider gemini when Gemini succeeds, asserting model, header, and key absence in URL", async () => {
-    const fetchMock = stubProviders({
-      gemini: () => makeJsonResponse(makeGeminiSuccess()),
-      nvidia: () => makeJsonResponse(makeNvidiaSuccess()),
-    });
+    const fetchMock = stubProviders(happyProviders);
 
     const result = await generateNarrative(familyProfile, samplePlan, keys);
 
@@ -172,7 +174,7 @@ describe("generateNarrative", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
-    expect(calledUrl).toContain("gemini-3-flash-preview");
+    expect(calledUrl).toContain("gemini-3.1-flash-lite");
     expect(calledUrl).not.toContain("test-gemini-key");
 
     const headers = extractHeaders(fetchMock.mock.calls[0]?.[1]);
@@ -194,7 +196,10 @@ describe("generateNarrative", () => {
 
     const headers = extractHeaders(fetchMock.mock.calls[1]?.[1]);
     expect(headers["authorization"]).toBe("Bearer test-nvidia-key");
-    expect(sentBody(fetchMock, 1)).toContain("nvidia/nemotron-3.5-lightning-30b-a3b");
+
+    const reqBody = JSON.parse(sentBody(fetchMock, 1));
+    expect(reqBody.model).toBe("nvidia/nemotron-3.5-lightning-30b-a3b");
+    expect(reqBody.chat_template_kwargs?.enable_thinking).toBe(false);
   });
 
   it("falls through to NVIDIA when Gemini returns a narrative containing digits", async () => {
@@ -244,10 +249,7 @@ describe("generateNarrative", () => {
   });
 
   it("preserves privacy: request body contains location name but never latitude or longitude", async () => {
-    const fetchMock = stubProviders({
-      gemini: () => makeJsonResponse(makeGeminiSuccess()),
-      nvidia: () => makeJsonResponse(makeNvidiaSuccess()),
-    });
+    const fetchMock = stubProviders(happyProviders);
 
     await generateNarrative(familyProfile, samplePlan, keys);
 
@@ -273,10 +275,7 @@ describe("generateNarrative", () => {
   });
 
   it("formats community profile and null airBand in payload correctly", async () => {
-    const fetchMock = stubProviders({
-      gemini: () => makeJsonResponse(makeGeminiSuccess()),
-      nvidia: () => makeJsonResponse(makeNvidiaSuccess()),
-    });
+    const fetchMock = stubProviders(happyProviders);
 
     const planWithNullBand: Plan = {
       ...samplePlan,
@@ -291,8 +290,68 @@ describe("generateNarrative", () => {
     expect(result?.provider).toBe("gemini");
     const body = sentBody(fetchMock, 0);
     expect(body).toContain("Green Heights");
-    expect(body).toContain('\\"households\\":45');
+    const req = JSON.parse(body);
+    const payload = JSON.parse(req.contents[0].parts[0].text);
+    expect(payload.DATA.households).toBe(45);
     expect(body).toContain('\\"airBand\\":null');
+  });
+
+  it("fails NVIDIA when content is null, logging empty content once, without affecting Gemini success", async () => {
+    const nullContentNvidia = {
+      choices: [
+        {
+          finish_reason: "length",
+          message: {
+            content: null,
+            reasoning_content: "thinking...",
+          },
+        },
+      ],
+    };
+
+    const fetchMockFail = stubProviders({
+      gemini: () => new Response("Internal Server Error", { status: 500 }),
+      nvidia: () => makeJsonResponse(nullContentNvidia),
+    });
+
+    const failResult = await generateNarrative(familyProfile, samplePlan, keys);
+    expect(failResult).toBeNull();
+    expect(fetchMockFail).toHaveBeenCalledTimes(2);
+
+    const log = loggedText();
+    expect(log).toContain("LLM provider failed nvidia empty content");
+    expect(log.split("empty content").length - 1).toBe(1);
+
+    const fetchMockSuccess = stubProviders(happyProviders);
+    const successResult = await generateNarrative(familyProfile, samplePlan, keys);
+    expect(successResult?.provider).toBe("gemini");
+    expect(successResult?.narrative).toEqual(sampleNarrative);
+  });
+
+  it("parses Gemini response when single part contains thoughtSignature alongside text", async () => {
+    const fetchMock = stubProviders({
+      gemini: () =>
+        makeJsonResponse({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify(sampleNarrative),
+                    thoughtSignature: "x",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      nvidia: () => makeJsonResponse(makeNvidiaSuccess()),
+    });
+
+    const result = await generateNarrative(familyProfile, samplePlan, keys);
+    expect(result).not.toBeNull();
+    expect(result?.provider).toBe("gemini");
+    expect(result?.narrative).toEqual(sampleNarrative);
   });
 
   it.each([
