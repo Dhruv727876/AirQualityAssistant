@@ -4,8 +4,8 @@ import type { Plan, GeneratedBy } from "./plan.js";
 import { parseNarrative, type Narrative } from "./narrative.js";
 import type { Config } from "./config.js";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
-const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
+const GEMINI_MODEL = "gemini-3-flash-preview";
+const NVIDIA_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
 const TIMEOUT_MS = 8000;
 
 export type LlmKeys = Pick<Config, "GEMINI_API_KEY" | "NVIDIA_API_KEY">;

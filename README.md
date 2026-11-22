@@ -74,7 +74,7 @@ Only the commute impact is multiplied by the number of households; every other f
 ## AI layer
 
 - **Wording only**: The model writes wording only; numbers come from the server. Digits in its output are rejected, so numerals cannot appear. The prompt also forbids statistics, but number words are not detected.
-- **Provider order & fallback**: Calls try Gemini (`gemini-2.5-flash`) first, then fall back to NVIDIA (`meta/llama-3.3-70b-instruct`). If both providers fail or return unusable text, the server returns the static plan at HTTP 200.
+- **Provider order & fallback**: Calls try Gemini (`gemini-3-flash-preview`) first, then fall back to NVIDIA (`nvidia/nemotron-3.5-lightning-30b-a3b`). If both providers fail or return unusable text, the server returns the static plan at HTTP 200. Model IDs are constants at the top of llm.ts. Providers retire models (one returned HTTP 410 during development), and the static plan is what keeps the app working when that happens.
 - **Privacy by design**: Only the location name, household composition (member counts, or the number of households), commute mode, heating and cooking type, whether a sensitive member is present, the air quality band label, the verdict level and the titles of the plan's actions are sent. Coordinates are never sent. The profile is never logged.
 - **Prompt injection defence**: Untrusted input is encapsulated strictly inside a data payload; output is schema-validated and length-capped; clients must render it as text, never as HTML.
 - **Latency & timeouts**: Responses are validated in full before display. The worst case is the air data call (5 s timeout) plus two 8-second provider timeouts, then the static plan.

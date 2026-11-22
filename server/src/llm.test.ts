@@ -172,7 +172,7 @@ describe("generateNarrative", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
-    expect(calledUrl).toContain("gemini-2.5-flash");
+    expect(calledUrl).toContain("gemini-3-flash-preview");
     expect(calledUrl).not.toContain("test-gemini-key");
 
     const headers = extractHeaders(fetchMock.mock.calls[0]?.[1]);
@@ -194,6 +194,7 @@ describe("generateNarrative", () => {
 
     const headers = extractHeaders(fetchMock.mock.calls[1]?.[1]);
     expect(headers["authorization"]).toBe("Bearer test-nvidia-key");
+    expect(sentBody(fetchMock, 1)).toContain("nvidia/nemotron-3.5-lightning-30b-a3b");
   });
 
   it("falls through to NVIDIA when Gemini returns a narrative containing digits", async () => {
