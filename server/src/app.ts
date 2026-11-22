@@ -31,17 +31,18 @@ export function createApp(config: Config): Express {
 
   app.use(cors({ origin: config.ALLOWED_ORIGINS }));
 
-  app.use(compression());
-  app.use(express.json({ limit: "10kb" }));
-
-  app.use(createLimiter(GENERAL_LIMIT));
-
+  // Health check is exempt from rate limiting because platform health checks and uptime monitors poll it often and it makes no upstream call
   app.get("/api/health", (_req, res) => {
     res.status(200).json({
       status: "ok",
       uptimeSeconds: Math.floor(process.uptime()),
     });
   });
+
+  app.use(compression());
+  app.use(express.json({ limit: "10kb" }));
+
+  app.use(createLimiter(GENERAL_LIMIT));
 
   app.use("/api", airRouter);
 

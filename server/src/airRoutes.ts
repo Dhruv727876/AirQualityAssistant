@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { validateInput } from "./errors.js";
-import { searchPlaces } from "./openMeteo.js";
-import { loadAir } from "./airData.js";
+import { searchPlaces, getAirQuality } from "./openMeteo.js";
 
 const geocodeQuerySchema = z.object({
   q: z
@@ -34,6 +33,6 @@ airRouter.get("/geocode", async (req, res) => {
 
 airRouter.get("/air", async (req, res) => {
   const { lat, lon } = validateInput(airQuerySchema, req.query);
-  const data = await loadAir(lat, lon);
+  const data = await getAirQuality(lat, lon);
   res.status(200).json(data);
 });

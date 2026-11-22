@@ -12,9 +12,9 @@ export type ErrorCode =
 
 export class AppError extends Error {
   readonly status: number;
-  readonly code: ErrorCode | string;
+  readonly code: ErrorCode;
 
-  constructor(status: number, code: ErrorCode | string, message?: string) {
+  constructor(status: number, code: ErrorCode, message?: string) {
     super(message ?? code);
     this.name = "AppError";
     this.status = status;
@@ -38,7 +38,7 @@ export function validateInput<T>(schema: ZodType<T>, data: unknown): T {
   return result.data;
 }
 
-function sendError(res: Response, status: number, code: string, message: string): void {
+function sendError(res: Response, status: number, code: ErrorCode, message: string): void {
   res.status(status).json({
     error: {
       code,
@@ -47,7 +47,7 @@ function sendError(res: Response, status: number, code: string, message: string)
   });
 }
 
-const parserErrors = new Map<unknown, { status: number; code: string; message: string }>([
+const parserErrors = new Map<unknown, { status: number; code: ErrorCode; message: string }>([
   ["entity.parse.failed", { status: 400, code: "BAD_REQUEST", message: "Malformed JSON body" }],
   ["entity.too.large", { status: 413, code: "PAYLOAD_TOO_LARGE", message: "Request payload too large" }],
 ]);

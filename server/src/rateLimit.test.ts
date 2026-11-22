@@ -33,11 +33,11 @@ describe("Rate limiting middleware", () => {
     const app = createApp(testConfig);
 
     for (let i = 0; i < 100; i++) {
-      const res = await request(app).get("/api/health");
-      expect(res.status).toBe(200);
+      const res = await request(app).get("/api/geocode?q=a");
+      expect(res.status).toBe(400);
     }
 
-    const blockedRes = await request(app).get("/api/health");
+    const blockedRes = await request(app).get("/api/geocode?q=a");
     expect(blockedRes.status).toBe(429);
     expect(blockedRes.body).toEqual({
       error: {
@@ -45,5 +45,14 @@ describe("Rate limiting middleware", () => {
         message: "Too many requests, please try again later",
       },
     });
+  });
+
+  it("exempts /api/health from rate limiting across 120 requests", async () => {
+    const app = createApp(testConfig);
+
+    for (let i = 0; i < 120; i++) {
+      const res = await request(app).get("/api/health");
+      expect(res.status).toBe(200);
+    }
   });
 });
