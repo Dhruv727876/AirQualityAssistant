@@ -180,6 +180,9 @@ describe("plan builder", () => {
       const purifierAction = plan.actions.find((a) => a.id === "air-purifier");
       expect(purifierAction?.impact?.value).toBe(90);
 
+      const shiftAction = plan.actions.find((a) => a.id === "shift-outdoor-activity");
+      expect(shiftAction?.because).toContain("today at");
+
       const ventilateAction = plan.actions.find((a) => a.id === "ventilate-at-low-hour");
       expect(ventilateAction?.detail).toContain("keep windows closed");
 
@@ -218,6 +221,34 @@ describe("plan builder", () => {
       expect(avoidCarAction).toBeDefined();
       expect(avoidCarAction?.impact?.value).toBe(40);
       expect(avoidCarAction?.because).toContain("You commute by two-wheeler (5 km one-way, 4 days/week)");
+    });
+
+    it("labels forecast hours as tomorrow when readings span into the next day", () => {
+      const profile: FamilyProfile = {
+        ...baseFamilyProfile,
+      };
+
+      const air: PlanAir = {
+        current: {
+          time: "2026-01-01T16:30",
+          usAqi: 180,
+          pm25: 110,
+          band: { label: "Unhealthy", level: 3 },
+        },
+        hourly: [
+          { time: "2026-01-02T08:00", usAqi: 180, pm25: 100 },
+          { time: "2026-01-02T10:00", usAqi: 150, pm25: 70 },
+          { time: "2026-01-02T12:00", usAqi: 120, pm25: 60 },
+          { time: "2026-01-02T15:00", usAqi: 90, pm25: 40 },
+        ],
+      };
+
+      const plan = buildPlan(profile, air);
+      const shiftAction = plan.actions.find((a) => a.id === "shift-outdoor-activity");
+      const ventilateAction = plan.actions.find((a) => a.id === "ventilate-at-low-hour");
+
+      expect(shiftAction?.detail).toContain("tomorrow at 15:00");
+      expect(ventilateAction?.because).toContain("highest tomorrow at 08:00");
     });
 
     it("go day with clean lifestyle returns zero actions", () => {

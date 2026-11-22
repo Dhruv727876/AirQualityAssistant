@@ -38,7 +38,7 @@ The application enforces a strict deterministic design rule: the LLM never produ
 | `air-purifier` | % lower indoor PM2.5 than the same room without it (steady state) | rough estimate | none |
 | `avoid-car-trips` | private-vehicle km avoided per week | arithmetic | none |
 
-The WHO ratio is the PM2.5 reading divided by 15 µg/m³, the 24-hour guideline level from "WHO global air quality guidelines, 2021" (defined by WHO as the 99th percentile of daily means, i.e. exceeded on at most 3-4 days a year; basis: standard). The app compares it to a single hourly reading, so the ratio is indicative only.
+The WHO ratio is the PM2.5 reading divided by 15 µg/m³, the 24-hour guideline level from "WHO global air quality guidelines, 2021" (defined by WHO as the 99th percentile of daily means, i.e. exceeded on at most 3-4 days a year; basis: standard). The app compares it to a single hourly reading, so the ratio is indicative only. Forecast hours are in the location's local time and are labelled "today" or "tomorrow" relative to the current reading, and the best hour is the lowest forecast value in the waking window, which can still be unhealthy.
 
 Heating and cooking fuel swaps are not quantified in this model. All figures are estimates, not medical advice.
 

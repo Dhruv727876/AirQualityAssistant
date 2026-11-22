@@ -6,6 +6,7 @@ import {
   timingImpact,
   purifierImpact,
   avoidCarTripsImpact,
+  formatWhen,
 } from "./impact.js";
 import type { HourlyAir } from "./openMeteo.js";
 
@@ -72,6 +73,26 @@ describe("wakingExtremes", () => {
   });
 });
 
+describe("formatWhen", () => {
+  it.each([
+    {
+      reading: { time: "2026-01-01T14:00", hour: 14, pm25: 20 },
+      current: "2026-01-01T10:00",
+      expected: "today at 14:00",
+    },
+    {
+      reading: { time: "2026-01-02T08:00", hour: 8, pm25: 50 },
+      current: "2026-01-01T10:00",
+      expected: "tomorrow at 08:00",
+    },
+  ])(
+    "formats reading $reading.time with current $current -> $expected",
+    ({ reading, current, expected }) => {
+      expect(formatWhen(reading, current)).toBe(expected);
+    }
+  );
+});
+
 describe("whoRatio", () => {
   it.each([
     [30, 2],
@@ -102,13 +123,14 @@ describe("timingImpact", () => {
       { time: "2026-01-01T23:00", usAqi: 40, pm25: 15 }, // outside waking hours (ignored)
     ];
 
-    const impact = timingImpact("shift-outdoor-activity", hourly);
+    const impact = timingImpact("shift-outdoor-activity", hourly, "2026-01-01T10:00");
     expect(impact).not.toBeNull();
     // (1 - 20 / 50) * 100 = 60%
     expect(impact?.value).toBe(60);
     expect(impact?.basis).toBe("forecast");
     expect(impact?.assumptions[0]).toContain("14:00");
     expect(impact?.assumptions[0]).toContain("18:00");
+    expect(impact?.assumptions[0]).toContain("today at 14:00");
   });
 
   it("ignores entries with null pm25", () => {
@@ -118,7 +140,7 @@ describe("timingImpact", () => {
       { time: "2026-01-01T12:00", usAqi: 50, pm25: 20 },
     ];
 
-    const impact = timingImpact("ventilate-at-low-hour", hourly);
+    const impact = timingImpact("ventilate-at-low-hour", hourly, "2026-01-01T00:00");
     expect(impact).not.toBeNull();
     // (1 - 20 / 40) * 100 = 50%
     expect(impact?.value).toBe(50);
@@ -130,7 +152,7 @@ describe("timingImpact", () => {
       { time: "2026-01-01T08:00", usAqi: 100, pm25: 40 },
     ];
 
-    expect(timingImpact("shift-outdoor-activity", hourly)).toBeNull();
+    expect(timingImpact("shift-outdoor-activity", hourly, "2026-01-01T00:00")).toBeNull();
   });
 
   it("returns null when worst pm25 is 0", () => {
@@ -139,7 +161,7 @@ describe("timingImpact", () => {
       { time: "2026-01-01T10:00", usAqi: 0, pm25: 0 },
     ];
 
-    expect(timingImpact("ventilate-at-low-hour", hourly)).toBeNull();
+    expect(timingImpact("ventilate-at-low-hour", hourly, "2026-01-01T00:00")).toBeNull();
   });
 
   it.each([
@@ -154,7 +176,7 @@ describe("timingImpact", () => {
       { time: "2026-01-01T13:00", usAqi: 100, pm25: 40 },
     ];
 
-    const impact = timingImpact("shift-outdoor-activity", hourly);
+    const impact = timingImpact("shift-outdoor-activity", hourly, "2026-01-01T00:00");
     expect(impact).not.toBeNull();
     expect(impact?.value).toBe(expected);
   });

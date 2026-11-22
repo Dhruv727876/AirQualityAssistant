@@ -62,6 +62,12 @@ export function formatHour(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+// current.time and hourly times are both local to the location, so comparing the date prefix is valid.
+export function formatWhen(reading: HourReading, currentTime: string): string {
+  const day = reading.time.slice(0, 10) === currentTime.slice(0, 10) ? "today" : "tomorrow";
+  return `${day} at ${formatHour(reading.hour)}`;
+}
+
 export function wakingExtremes(
   hourly: HourlyAir[]
 ): { best: HourReading; worst: HourReading } | null {
@@ -118,7 +124,8 @@ export function maskImpact(): Impact {
 
 export function timingImpact(
   lever: "shift-outdoor-activity" | "ventilate-at-low-hour",
-  hourly: HourlyAir[]
+  hourly: HourlyAir[],
+  currentTime: string
 ): Impact | null {
   const extremes = wakingExtremes(hourly);
   if (!extremes) {
@@ -140,7 +147,7 @@ export function timingImpact(
     basis: "forecast",
     source: "Open-Meteo Air Quality API (Copernicus CAMS model)",
     assumptions: [
-      `Forecast: ${best.pm25} µg/m³ at ${formatHour(best.hour)} vs ${worst.pm25} µg/m³ at ${formatHour(worst.hour)}`,
+      `Forecast: ${best.pm25} µg/m³ ${formatWhen(best, currentTime)} vs ${worst.pm25} µg/m³ ${formatWhen(worst, currentTime)}`,
       `Waking-hours window: ${formatHour(waking.start)} to ${formatHour(waking.end)}`,
       "Modelled forecast on a coarse grid; conditions on your street can differ",
     ],

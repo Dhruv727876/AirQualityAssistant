@@ -9,7 +9,7 @@ import {
   avoidCarTripsImpact,
   whoRatio,
   wakingExtremes,
-  formatHour,
+  formatWhen,
 } from "./impact.js";
 
 export type ActionId = Lever | "cleaner-heating" | "cleaner-cooking";
@@ -143,24 +143,28 @@ export function buildPlan(profile: Profile, air: PlanAir): Plan {
   }
 
   if (airDriven && extremes !== null) {
-    const shiftImpact = timingImpact("shift-outdoor-activity", air.hourly);
+    const shiftImpact = timingImpact(
+      "shift-outdoor-activity",
+      air.hourly,
+      air.current.time
+    );
     if (shiftImpact !== null) {
-      const bestHourStr = formatHour(extremes.best.hour);
-      const worstHourStr = formatHour(extremes.worst.hour);
+      const bestWhen = formatWhen(extremes.best, air.current.time);
+      const worstWhen = formatWhen(extremes.worst, air.current.time);
 
       actions.push({
         id: "shift-outdoor-activity",
         title: "Shift outdoor activities to cleaner hours",
-        detail: `Shift outdoor exercise, errands, or walks to around ${bestHourStr} when pollution is lowest.`,
-        because: `Forecast PM2.5 is lowest at ${bestHourStr} and highest at ${worstHourStr}`,
+        detail: `Shift outdoor exercise, errands or walks to ${bestWhen}, when forecast PM2.5 is lowest. That is relatively cleaner, not necessarily clean, so check the live reading first.`,
+        because: `Forecast PM2.5 is lowest ${bestWhen} and highest ${worstWhen}`,
         impact: shiftImpact,
       });
 
       actions.push({
         id: "ventilate-at-low-hour",
         title: "Ventilate during cleaner hours",
-        detail: `Open windows near ${bestHourStr}, when outdoor PM2.5 is forecast to be lowest, and keep them closed near ${worstHourStr}. If the air outside is still unhealthy at that hour, keep windows closed.`,
-        because: `Forecast PM2.5 is lowest at ${bestHourStr} and highest at ${worstHourStr}`,
+        detail: `Open windows ${bestWhen}, when outdoor PM2.5 is forecast to be lowest, and keep them closed ${worstWhen}. If the air outside is still unhealthy then, keep windows closed.`,
+        because: `Forecast PM2.5 is lowest ${bestWhen} and highest ${worstWhen}`,
         impact: {
           ...shiftImpact,
           lever: "ventilate-at-low-hour",
