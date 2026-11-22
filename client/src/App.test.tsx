@@ -1,49 +1,66 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, act, waitFor } from "@testing-library/react";
 import { App } from "./App";
 
 describe("App", () => {
-  const originalFetch = globalThis.fetch;
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
   afterEach(() => {
-    globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
-  it("renders pending state then ready state upon successful health check", async () => {
-    let resolveHealth = (_value: Response): void => {};
-    const healthPromise = new Promise<Response>((resolve) => {
-      resolveHealth = resolve;
-    });
-
-    globalThis.fetch = vi.fn().mockReturnValue(healthPromise);
-
-    render(<App />);
-
-    expect(screen.getByRole("status").textContent).toContain("Connecting to server");
-
-    resolveHealth(
-      new Response(JSON.stringify({ status: "ok", uptimeSeconds: 5 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+  it("the waking message appears after 2 seconds with fake timers while health is pending", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockReturnValue(new Promise(() => {}))
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Server ready")).toBeTruthy();
+    render(<App />);
+
+    expect(screen.queryByRole("status")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
     });
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "Waking the server, this can take up to 15 seconds."
+    );
   });
 
-  it("renders clear failure message when server check fails", async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error("Network connection error"));
+  it("nothing shows after success", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ status: "ok", uptimeSeconds: 5 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
+
+    render(<App />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("the unreachable message shows after failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("Network connection error"))
+    );
 
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toContain("Network connection error");
+      expect(screen.getByRole("status").textContent).toBe(
+        "The server could not be reached."
+      );
     });
   });
 });

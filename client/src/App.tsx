@@ -1,36 +1,30 @@
 import { useEffect, useState } from "react";
-import { apiFetch } from "./api";
-
-interface HealthResponse {
-  status: string;
-  uptimeSeconds: number;
-}
-
-type Status = "pending" | "ready" | "error";
+import { getHealth } from "./api";
 
 export function App() {
-  const [status, setStatus] = useState<Status>("pending");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setStatusMessage("Waking the server, this can take up to 15 seconds.");
+    }, 2000);
 
-    apiFetch<HealthResponse>("/api/health")
+    getHealth(controller.signal)
       .then(() => {
-        if (!cancelled) {
-          setStatus("ready");
-        }
+        clearTimeout(timer);
+        setStatusMessage(null);
       })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setStatus("error");
-          const message = error instanceof Error ? error.message : "Failed to connect to server";
-          setErrorMessage(message);
+      .catch(() => {
+        clearTimeout(timer);
+        if (!controller.signal.aborted) {
+          setStatusMessage("The server could not be reached.");
         }
       });
 
     return () => {
-      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
     };
   }, []);
 
@@ -40,19 +34,8 @@ export function App() {
         <h1>Urban Air Quality Assistant</h1>
       </header>
       <main>
-        {status === "pending" && (
-          <p role="status" aria-live="polite">
-            Connecting to server…
-          </p>
-        )}
-        {status === "ready" && <p>Server ready</p>}
-        {status === "error" && (
-          <p role="alert">
-            {errorMessage ? `Error: ${errorMessage}` : "Failed to connect to server"}
-          </p>
-        )}
+        {statusMessage ? <p role="status">{statusMessage}</p> : null}
       </main>
     </div>
   );
 }
-
