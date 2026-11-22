@@ -5,7 +5,7 @@ import compression from "compression";
 import type { Config } from "./config.js";
 import { AppError, errorHandler } from "./errors.js";
 import { airRouter } from "./airRoutes.js";
-import { planRouter } from "./planRoutes.js";
+import { createPlanRouter } from "./planRoutes.js";
 import { createLimiter } from "./rateLimit.js";
 
 const GENERAL_LIMIT = 100;
@@ -47,7 +47,7 @@ export function createApp(config: Config): Express {
   app.use("/api", airRouter);
 
   app.use("/api/plan", createLimiter(PLAN_LIMIT));
-  app.use("/api", planRouter);
+  app.use("/api", createPlanRouter(config));
 
   app.use((_req, _res, next) => {
     next(new AppError(404, "NOT_FOUND", "Route not found"));

@@ -1,5 +1,6 @@
 import type { Profile } from "./profile.js";
 import type { HourlyAir } from "./openMeteo.js";
+import type { Narrative } from "./narrative.js";
 import {
   type Impact,
   type Lever,
@@ -41,8 +42,11 @@ interface Action {
   impact: Impact | null;
 }
 
+export type GeneratedBy = "static" | "gemini" | "nvidia";
+
 export interface Plan {
-  generatedBy: "static";
+  generatedBy: GeneratedBy;
+  narrative: Narrative | null;
   air: {
     time: string;
     usAqi: number | null;
@@ -230,6 +234,7 @@ export function buildPlan(profile: Profile, air: PlanAir): Plan {
 
   return {
     generatedBy: "static",
+    narrative: null,
     air: {
       time: air.current.time,
       usAqi: air.current.usAqi,

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import type { Config } from "./config.js";
+import type { Profile } from "./profile.js";
 
 const testConfig: Config = {
   PORT: 8080,
@@ -40,18 +41,49 @@ function makeUpstreamAir() {
   };
 }
 
-function stubFetch(body = makeUpstreamAir()) {
-  const fetchMock = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify(body), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    })
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
+interface StubFetchOptions {
+  airBody?: unknown;
+  llmResponse?: (url: string) => Response | Promise<Response>;
 }
 
-const validFamilyProfile = {
+function stubFetch(options?: StubFetchOptions) {
+  const airBody = options?.airBody ?? makeUpstreamAir();
+  const llmResponse = options?.llmResponse;
+
+  const openMeteoMock = vi.fn().mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify(airBody), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    )
+  );
+
+  const llmMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (llmResponse) {
+      return Promise.resolve(llmResponse(url));
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ error: "LLM unavailable" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  });
+
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("open-meteo.com")) {
+      return openMeteoMock(input, init);
+    }
+    return llmMock(input, init);
+  });
+
+  return openMeteoMock;
+}
+
+const validFamilyProfile: Profile = {
   mode: "family",
   location: { name: "Central Park", latitude: 40.78, longitude: -73.96 },
   members: { adults: 2, children: 1, elderly: 0 },
@@ -63,7 +95,7 @@ const validFamilyProfile = {
   purifierCadrM3PerHour: 250,
 };
 
-const validCommunityProfile = {
+const validCommunityProfile: Profile = {
   mode: "community",
   households: 50,
   location: { name: "Green Heights", latitude: 28.61, longitude: 77.2 },
@@ -75,8 +107,13 @@ const validCommunityProfile = {
 };
 
 describe("POST /api/plan", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("handles valid family profile with status 200 and static plan", async () => {
@@ -162,14 +199,11 @@ describe("POST /api/plan", () => {
 
   it("maps upstream rejection to 502 UPSTREAM_ERROR in standard envelope", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network failed")));
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createApp(testConfig);
 
     const response = await request(app)
       .post("/api/plan")
       .send(validFamilyProfile);
-
-    consoleSpy.mockRestore();
 
     expect(response.status).toBe(502);
     expect(response.body).toEqual({
@@ -178,5 +212,69 @@ describe("POST /api/plan", () => {
         message: "Location and air quality data are temporarily unavailable",
       },
     });
+  });
+
+  it("with LLM mocked to succeed, response has generatedBy gemini, non-null narrative, and actions deep-equal to static run", async () => {
+    const sampleNarrative = {
+      summary: "Air quality requires care today. Reducing exposure protects health.",
+      routine: [
+        { period: "morning", advice: "Keep windows closed during early hours." },
+      ],
+      tips: [
+        { title: "Filtration", detail: "Use an air purifier indoors." },
+      ],
+    };
+
+    const app = createApp(testConfig);
+
+    // Call stubFetch() (LLM failing) and POST the family profile. Keep that body as staticBody.
+    stubFetch();
+    const staticResponse = await request(app)
+      .post("/api/plan")
+      .send(validFamilyProfile);
+    expect(staticResponse.status).toBe(200);
+    const staticBody = staticResponse.body;
+
+    // Call stubFetch({ llmResponse }) with a successful Gemini response and POST the same profile.
+    stubFetch({
+      llmResponse: () =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: JSON.stringify(sampleNarrative) }],
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+    });
+
+    const response = await request(app)
+      .post("/api/plan")
+      .send(validFamilyProfile);
+
+    expect(response.status).toBe(200);
+    expect(response.body.generatedBy).toBe("gemini");
+    expect(response.body.narrative).toEqual(sampleNarrative);
+    expect(response.body.actions).toEqual(staticBody.actions);
+  });
+
+  it("with both LLM hosts failing, returns 200 with generatedBy static and narrative null", async () => {
+    stubFetch();
+    const app = createApp(testConfig);
+
+    const response = await request(app)
+      .post("/api/plan")
+      .send(validFamilyProfile);
+
+    expect(response.status).toBe(200);
+    expect(response.body.generatedBy).toBe("static");
+    expect(response.body.narrative).toBeNull();
   });
 });
