@@ -173,4 +173,64 @@ describe("ProfileForm", () => {
       screen.getByLabelText("Someone sensitive lives here")
     ).toBeDefined();
   });
+
+  it("failed submit sets aria-invalid and aria-describedby pointing to error alert", () => {
+    const handleSubmit = vi.fn();
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={handleSubmit}
+        submitting={false}
+      />
+    );
+
+    const adultsInput = screen.getByLabelText("Adults");
+    fireEvent.change(adultsInput, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(adultsInput.getAttribute("aria-invalid")).toBe("true");
+    expect(adultsInput.getAttribute("aria-describedby")).toBe("form-error");
+
+    const alert = screen.getByRole("alert");
+    expect(alert.id).toBe("form-error");
+    expect(alert.textContent).toContain("Invalid fields: members.adults");
+  });
+
+  it("failed submit moves focus to the first invalid field", () => {
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    const adultsInput = screen.getByLabelText("Adults");
+    fireEvent.change(adultsInput, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(document.activeElement).toBe(adultsInput);
+  });
+
+  it("valid fields do not have aria-invalid attribute", () => {
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    const adultsInput = screen.getByLabelText("Adults");
+    const childrenInput = screen.getByLabelText("Children");
+
+    fireEvent.change(adultsInput, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(childrenInput.hasAttribute("aria-invalid")).toBe(false);
+    expect(childrenInput.hasAttribute("aria-describedby")).toBe(false);
+  });
 });

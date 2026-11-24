@@ -71,4 +71,65 @@ describe("LocationSearch", () => {
       expect(liveRegion.textContent).toBe("Search failed. Try again.");
     });
   });
+
+  it("announces the result count in an aria-live region that exists before the search", async () => {
+    const places = [
+      {
+        name: "Berlin",
+        region: "Berlin",
+        country: "Germany",
+        latitude: 52.52,
+        longitude: 13.405,
+      },
+      {
+        name: "Berlin",
+        region: "Connecticut",
+        country: "United States",
+        latitude: 41.62,
+        longitude: -72.76,
+      },
+    ];
+    stubFetch(jsonResponse({ results: places }));
+
+    const { container } = render(<LocationSearch onSelect={vi.fn()} selected={null} />);
+
+    const liveRegion = container.querySelector('[aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion?.textContent).toBe("");
+
+    const input = screen.getByLabelText("Search location");
+    fireEvent.change(input, { target: { value: "Berlin" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => {
+      expect(liveRegion?.textContent).toBe("2 places found.");
+    });
+  });
+
+  it("with one place returned, the same element reads '1 place found.'", async () => {
+    const places = [
+      {
+        name: "Berlin",
+        region: "Berlin",
+        country: "Germany",
+        latitude: 52.52,
+        longitude: 13.405,
+      },
+    ];
+    stubFetch(jsonResponse({ results: places }));
+
+    const { container } = render(<LocationSearch onSelect={vi.fn()} selected={null} />);
+
+    const liveRegion = container.querySelector('[aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion?.textContent).toBe("");
+
+    const input = screen.getByLabelText("Search location");
+    fireEvent.change(input, { target: { value: "Berlin" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => {
+      expect(liveRegion?.textContent).toBe("1 place found.");
+    });
+  });
 });

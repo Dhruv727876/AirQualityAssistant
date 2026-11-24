@@ -64,6 +64,13 @@ export function LocationSearch({ onSelect, selected }: LocationSearchProps) {
     onSelect(selectedPlace);
   };
 
+  const message =
+    places.length === 0
+      ? ""
+      : places.length === 1
+        ? "1 place found."
+        : `${places.length} places found.`;
+
   return (
     <div className="location-search">
       <div className="location-search-controls">
@@ -87,6 +94,9 @@ export function LocationSearch({ onSelect, selected }: LocationSearchProps) {
           </button>
         </div>
       </div>
+
+      {/* WHY: A live region must be in the DOM before its text changes; the existing role="status" element is conditional so it cannot announce counts. */}
+      <span aria-live="polite">{message}</span>
 
       {status && (
         <p role="status">
