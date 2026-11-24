@@ -1,6 +1,19 @@
 import { z } from "zod";
 import { AppError } from "./errors.js";
 import { aqiBand, type AqiBand } from "./aqiBand.js";
+import { createTtlCache } from "./ttlCache.js";
+
+const GEOCODE_TTL_MS = 60 * 60 * 1000;
+const AIR_TTL_MS = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
+
+const geocodeCache = createTtlCache<{ results: GeocodePlace[] }>(GEOCODE_TTL_MS, MAX_CACHE_ENTRIES);
+const airCache = createTtlCache<AirQualityData>(AIR_TTL_MS, MAX_CACHE_ENTRIES);
+
+export function clearUpstreamCaches(): void {
+  geocodeCache.clear();
+  airCache.clear();
+}
 
 const geocodingResultSchema = z.object({
   name: z.string(),
@@ -75,6 +88,12 @@ async function fetchJson<T>(url: string, schema: z.ZodType<T>): Promise<T> {
 }
 
 export async function searchPlaces(query: string): Promise<{ results: GeocodePlace[] }> {
+  const key = query.trim().toLowerCase();
+  const cached = geocodeCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const params = new URLSearchParams({
     name: query,
     count: "5",
@@ -85,7 +104,7 @@ export async function searchPlaces(query: string): Promise<{ results: GeocodePla
   const data = await fetchJson(url, geocodingResponseSchema);
   const places = data.results ?? [];
 
-  return {
+  const result = {
     results: places.map((place) => ({
       name: place.name,
       region: place.admin1,
@@ -94,9 +113,17 @@ export async function searchPlaces(query: string): Promise<{ results: GeocodePla
       longitude: place.longitude,
     })),
   };
+  geocodeCache.set(key, result);
+  return result;
 }
 
 export async function getAirQuality(lat: number, lon: number): Promise<AirQualityData> {
+  const key = `${lat},${lon}`;
+  const cached = airCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const params = new URLSearchParams({
     latitude: lat.toString(),
     longitude: lon.toString(),
@@ -129,7 +156,7 @@ export async function getAirQuality(lat: number, lon: number): Promise<AirQualit
     }
   }
 
-  return {
+  const result: AirQualityData = {
     current: {
       time: data.current.time,
       usAqi,
@@ -139,4 +166,6 @@ export async function getAirQuality(lat: number, lon: number): Promise<AirQualit
     },
     hourly: hourlyList,
   };
+  airCache.set(key, result);
+  return result;
 }

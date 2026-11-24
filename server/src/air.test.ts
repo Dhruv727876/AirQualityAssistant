@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import type { Config } from "./config.js";
 import { aqiBand } from "./aqiBand.js";
+import { clearUpstreamCaches } from "./openMeteo.js";
 
 const testConfig: Config = {
   PORT: 8080,
@@ -21,6 +22,10 @@ function makeJsonResponse(body: unknown, status = 200): Response {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  clearUpstreamCaches();
 });
 
 describe("aqiBand", () => {
@@ -402,5 +407,96 @@ describe("Upstream failure handling", () => {
 
     expect(response.status).toBe(400);
     expect(response.headers["cache-control"]).toBeUndefined();
+  });
+
+  it("two identical GET /api/geocode requests call fetch once", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      makeJsonResponse({
+        results: [
+          {
+            id: 1,
+            name: "Delhi",
+            latitude: 28.65,
+            longitude: 77.23,
+          },
+        ],
+      })
+    );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const app = createApp(testConfig);
+    const res1 = await request(app).get("/api/geocode?q=Delhi");
+    const res2 = await request(app).get("/api/geocode?q=Delhi");
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(res2.body).toEqual(res1.body);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("two identical GET /api/air requests call fetch once", async () => {
+    const times: string[] = [];
+    const aqiList: number[] = [];
+    const pm25List: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      times.push(`2026-01-01T${String(i % 24).padStart(2, "0")}:00`);
+      aqiList.push(50);
+      pm25List.push(20);
+    }
+
+    const mockFetch = vi.fn().mockResolvedValue(
+      makeJsonResponse({
+        current: {
+          time: "2026-01-01T10:00",
+          us_aqi: 55,
+          pm2_5: 22,
+          pm10: 40,
+        },
+        hourly: {
+          time: times,
+          us_aqi: aqiList,
+          pm2_5: pm25List,
+        },
+      })
+    );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const app = createApp(testConfig);
+    const res1 = await request(app).get("/api/air?lat=28.6&lon=77.2");
+    const res2 = await request(app).get("/api/air?lat=28.6&lon=77.2");
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(res2.body).toEqual(res1.body);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed upstream call is not cached: first fetch mock returns a 500, the second returns success, and the second request returns 200 (fetch called twice)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("Internal Server Error", { status: 500 }))
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          results: [
+            {
+              id: 1,
+              name: "Delhi",
+              latitude: 28.65,
+              longitude: 77.23,
+            },
+          ],
+        })
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const app = createApp(testConfig);
+    const res1 = await request(app).get("/api/geocode?q=Delhi");
+    const res2 = await request(app).get("/api/geocode?q=Delhi");
+    consoleSpy.mockRestore();
+
+    expect(res1.status).toBe(502);
+    expect(res2.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

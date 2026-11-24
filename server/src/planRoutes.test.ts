@@ -3,6 +3,7 @@ import request from "supertest";
 import { createApp } from "./app.js";
 import type { Config } from "./config.js";
 import type { Profile } from "./profile.js";
+import { clearUpstreamCaches } from "./openMeteo.js";
 
 const testConfig: Config = {
   PORT: 8080,
@@ -10,6 +11,10 @@ const testConfig: Config = {
   NVIDIA_API_KEY: "test-nvidia-key",
   ALLOWED_ORIGINS: ["http://localhost:5173"],
 };
+
+beforeEach(() => {
+  clearUpstreamCaches();
+});
 
 function makeUpstreamAir() {
   const times: string[] = [];
