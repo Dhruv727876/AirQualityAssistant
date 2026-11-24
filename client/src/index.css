@@ -78,3 +78,30 @@ form {
   padding-left: 1rem;
   margin-bottom: 1.5rem;
 }
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print {
+    display: none;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  body {
+    color: #000;
+    background: #fff;
+  }
+
+  .plan-action {
+    break-inside: avoid;
+  }
+
+  #root {
+    max-width: none;
+  }
+}

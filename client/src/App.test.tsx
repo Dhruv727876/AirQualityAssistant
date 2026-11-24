@@ -12,6 +12,7 @@ describe("App", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("the waking message appears after 2 seconds with fake timers while health is pending", () => {
@@ -202,5 +203,28 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "Plan for my family" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Plan for my community" })).toBeDefined();
+  });
+
+  it("renders printable title, print button, and triggers window.print", async () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+
+    stubFetchRoutes({
+      "/api/plan": () => jsonResponse(samplePlan),
+    });
+
+    localStorage.setItem("air_quality_profile", JSON.stringify(sampleProfile));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan for my family" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    const printBtn = await screen.findByRole("button", { name: "Print plan" });
+    expect(printBtn).toBeDefined();
+
+    expect(screen.getByText("Clean Air Plan for Delhi")).toBeDefined();
+
+    fireEvent.click(printBtn);
+    expect(printSpy).toHaveBeenCalledTimes(1);
   });
 });

@@ -110,13 +110,19 @@ export function App() {
         <h1>Urban Air Quality Assistant</h1>
       </header>
       <main>
-        {serverStatus && <p role="status">{serverStatus}</p>}
+        {serverStatus && <p role="status" className="no-print">{serverStatus}</p>}
 
         {plan ? (
           <div>
+            <p className="print-only print-title">
+              {lastProfile ? `Clean Air Plan for ${lastProfile.location.name}` : "Clean Air Plan"}
+            </p>
             <PlanView plan={plan} />
-            <button type="button" onClick={handleStartOver}>
+            <button type="button" className="no-print" onClick={handleStartOver}>
               Start over
+            </button>
+            <button type="button" className="no-print" onClick={() => window.print()}>
+              Print plan
             </button>
           </div>
         ) : mode ? (
