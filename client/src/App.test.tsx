@@ -257,4 +257,29 @@ describe("App", () => {
     });
     expect(document.activeElement).toBe(planRegion);
   });
+
+  it("opens details elements on beforeprint and closes them on afterprint", async () => {
+    stubFetchRoutes({
+      "/api/plan": () => jsonResponse(samplePlan),
+    });
+
+    localStorage.setItem("air_quality_profile", JSON.stringify(sampleProfile));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan for my family" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    await screen.findByRole("button", { name: "Print plan" });
+
+    const details = document.querySelector("details");
+    expect(details).not.toBeNull();
+    expect(details?.open).toBe(false);
+
+    window.dispatchEvent(new Event("beforeprint"));
+    expect(details?.open).toBe(true);
+
+    window.dispatchEvent(new Event("afterprint"));
+    expect(details?.open).toBe(false);
+  });
 });

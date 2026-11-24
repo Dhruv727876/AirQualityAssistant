@@ -74,6 +74,35 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    // Browsers print a closed <details> collapsed, and Ctrl+P bypasses the Print button, hence the events.
+    const openedDetails: HTMLDetailsElement[] = [];
+
+    const handleBeforePrint = () => {
+      for (const details of document.querySelectorAll("details")) {
+        if (!details.open) {
+          details.open = true;
+          openedDetails.push(details);
+        }
+      }
+    };
+
+    const handleAfterPrint = () => {
+      for (const details of openedDetails) {
+        details.open = false;
+      }
+      openedDetails.length = 0;
+    };
+
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+
+    return () => {
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, []);
+
   const handlePlanSubmit = (profile: Profile) => {
     saveProfile(profile);
     setLastProfile(profile);
