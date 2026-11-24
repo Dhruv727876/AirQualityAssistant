@@ -270,4 +270,25 @@ describe("POST /api/plan", () => {
     expect(response.body.generatedBy).toBe("static");
     expect(response.body.narrative).toBeNull();
   });
+
+  it("plan success has cache-control exactly no-store", async () => {
+    stubFetch();
+    const app = createApp(testConfig);
+    const response = await request(app)
+      .post("/api/plan")
+      .send(validFamilyProfile);
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("a plan request that returns 400 has no cache-control header", async () => {
+    const app = createApp(testConfig);
+    const response = await request(app)
+      .post("/api/plan")
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.headers["cache-control"]).toBeUndefined();
+  });
 });

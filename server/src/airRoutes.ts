@@ -28,11 +28,15 @@ export const airRouter = Router();
 airRouter.get("/geocode", async (req, res) => {
   const { q } = validateInput(geocodeQuerySchema, req.query);
   const data = await searchPlaces(q);
+  // WHY: Place data rarely changes; air data updates hourly.
+  res.setHeader("Cache-Control", "public, max-age=3600");
   res.status(200).json(data);
 });
 
 airRouter.get("/air", async (req, res) => {
   const { lat, lon } = validateInput(airQuerySchema, req.query);
   const data = await getAirQuality(lat, lon);
+  // WHY: Place data rarely changes; air data updates hourly.
+  res.setHeader("Cache-Control", "public, max-age=300");
   res.status(200).json(data);
 });

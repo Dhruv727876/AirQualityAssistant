@@ -14,6 +14,7 @@ export function createPlanRouter(keys: LlmKeys): Router {
     const air = await getAirQuality(profile.location.latitude, profile.location.longitude);
     const plan = buildPlan(profile, air);
     const result = await generateNarrative(profile, plan, keys);
+    res.setHeader("Cache-Control", "no-store");
     if (result !== null) {
       res.json({
         ...plan,

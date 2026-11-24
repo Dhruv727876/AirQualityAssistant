@@ -335,4 +335,72 @@ describe("Upstream failure handling", () => {
     });
     expect(JSON.stringify(response.body)).not.toContain("Connection timed out");
   });
+
+  it("geocode success has cache-control exactly public, max-age=3600", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        makeJsonResponse({
+          results: [
+            {
+              id: 1,
+              name: "Delhi",
+              latitude: 28.65,
+              longitude: 77.23,
+            },
+          ],
+        })
+      )
+    );
+
+    const app = createApp(testConfig);
+    const response = await request(app).get("/api/geocode?q=Delhi");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=3600");
+  });
+
+  it("air success has cache-control exactly public, max-age=300", async () => {
+    const times: string[] = [];
+    const aqiList: number[] = [];
+    const pm25List: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      times.push(`2026-01-01T${String(i % 24).padStart(2, "0")}:00`);
+      aqiList.push(50);
+      pm25List.push(20);
+    }
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        makeJsonResponse({
+          current: {
+            time: "2026-01-01T10:00",
+            us_aqi: 55,
+            pm2_5: 22,
+            pm10: 40,
+          },
+          hourly: {
+            time: times,
+            us_aqi: aqiList,
+            pm2_5: pm25List,
+          },
+        })
+      )
+    );
+
+    const app = createApp(testConfig);
+    const response = await request(app).get("/api/air?lat=28.6&lon=77.2");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=300");
+  });
+
+  it("a geocode request that returns 400 has no cache-control header", async () => {
+    const app = createApp(testConfig);
+    const response = await request(app).get("/api/geocode?q=a");
+
+    expect(response.status).toBe(400);
+    expect(response.headers["cache-control"]).toBeUndefined();
+  });
 });
