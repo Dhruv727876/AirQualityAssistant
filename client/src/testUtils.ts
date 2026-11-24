@@ -17,11 +17,7 @@ export function stubFetchRoutes(routes: Record<string, () => Response | Promise<
   const fetchMock = vi.fn().mockImplementation((url: string) => {
     for (const [key, handler] of Object.entries(routes)) {
       if (url.includes(key)) {
-        try {
-          return Promise.resolve(handler());
-        } catch (err) {
-          return Promise.reject(err);
-        }
+        return Promise.resolve(handler());
       }
     }
     if (url.includes("/api/health")) {

@@ -10,11 +10,7 @@ interface LocationSearchProps {
 }
 
 function formatPlaceLabel(place: GeocodePlace): string {
-  const parts: string[] = [];
-  if (place.name) parts.push(place.name);
-  if (place.region) parts.push(place.region);
-  if (place.country) parts.push(place.country);
-  return parts.join(", ");
+  return [place.name, place.region, place.country].filter(Boolean).join(", ");
 }
 
 export function LocationSearch({ onSelect, selected }: LocationSearchProps) {

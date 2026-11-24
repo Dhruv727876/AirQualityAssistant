@@ -34,11 +34,67 @@ const COOKING_OPTIONS: readonly { value: Cooking; label: string }[] = [
   { value: "wood-or-coal", label: "Wood or coal" },
 ];
 
-function pickOption<T extends string>(
-  options: readonly { value: T }[],
-  raw: string
-): T | undefined {
-  return options.find((o) => o.value === raw)?.value;
+interface NumberFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  min: string;
+  max: string;
+  onChange: (value: string) => void;
+}
+
+function NumberField({ id, label, value, min, max, onChange }: NumberFieldProps) {
+  return (
+    <div>
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+interface SelectFieldProps<T extends string> {
+  id: string;
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onChange: (v: T) => void;
+}
+
+function SelectField<T extends string>({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: SelectFieldProps<T>) {
+  return (
+    <div>
+      <label htmlFor={id}>{label}</label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => {
+          const match = options.find((o) => o.value === e.target.value);
+          if (match) {
+            onChange(match.value);
+          }
+        }}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileFormProps) {
@@ -163,155 +219,103 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
       {mode === "family" ? (
         <fieldset className="form-group">
           <legend>Household members</legend>
-          <div>
-            <label htmlFor="family-adults">Adults</label>
-            <input
-              id="family-adults"
-              type="number"
-              min="1"
-              max="10"
-              value={adults}
-              onChange={(e) => setAdults(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="family-children">Children</label>
-            <input
-              id="family-children"
-              type="number"
-              min="0"
-              max="10"
-              value={children}
-              onChange={(e) => setChildren(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="family-elderly">Elderly</label>
-            <input
-              id="family-elderly"
-              type="number"
-              min="0"
-              max="10"
-              value={elderly}
-              onChange={(e) => setElderly(e.target.value)}
-            />
-          </div>
+          <NumberField
+            id="family-adults"
+            label="Adults"
+            value={adults}
+            min="1"
+            max="10"
+            onChange={setAdults}
+          />
+          <NumberField
+            id="family-children"
+            label="Children"
+            value={children}
+            min="0"
+            max="10"
+            onChange={setChildren}
+          />
+          <NumberField
+            id="family-elderly"
+            label="Elderly"
+            value={elderly}
+            min="0"
+            max="10"
+            onChange={setElderly}
+          />
         </fieldset>
       ) : (
         <div className="form-group">
-          <label htmlFor="community-households">Households</label>
-          <input
+          <NumberField
             id="community-households"
-            type="number"
+            label="Households"
+            value={households}
             min="2"
             max="10000"
-            value={households}
-            onChange={(e) => setHouseholds(e.target.value)}
+            onChange={setHouseholds}
           />
         </div>
       )}
 
       <fieldset className="form-group">
         <legend>Daily commute</legend>
-        <div>
-          <label htmlFor="commute-mode">Commute mode</label>
-          <select
-            id="commute-mode"
-            value={commuteMode}
-            onChange={(e) => {
-              const v = pickOption(COMMUTE_OPTIONS, e.target.value);
-              if (v) setCommuteMode(v);
-            }}
-          >
-            {COMMUTE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="commute-km">One-way distance (km)</label>
-          <input
-            id="commute-km"
-            type="number"
-            min="0"
-            max="200"
-            value={oneWayKm}
-            onChange={(e) => setOneWayKm(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="commute-days">Days per week</label>
-          <input
-            id="commute-days"
-            type="number"
-            min="0"
-            max="7"
-            value={daysPerWeek}
-            onChange={(e) => setDaysPerWeek(e.target.value)}
-          />
-        </div>
+        <SelectField
+          id="commute-mode"
+          label="Commute mode"
+          value={commuteMode}
+          options={COMMUTE_OPTIONS}
+          onChange={setCommuteMode}
+        />
+        <NumberField
+          id="commute-km"
+          label="One-way distance (km)"
+          value={oneWayKm}
+          min="0"
+          max="200"
+          onChange={setOneWayKm}
+        />
+        <NumberField
+          id="commute-days"
+          label="Days per week"
+          value={daysPerWeek}
+          min="0"
+          max="7"
+          onChange={setDaysPerWeek}
+        />
       </fieldset>
 
       <fieldset className="form-group">
         <legend>Home and heating</legend>
-        <div>
-          <label htmlFor="heating-mode">Heating</label>
-          <select
-            id="heating-mode"
-            value={heating}
-            onChange={(e) => {
-              const v = pickOption(HEATING_OPTIONS, e.target.value);
-              if (v) setHeating(v);
-            }}
-          >
-            {HEATING_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="cooking-mode">Cooking</label>
-          <select
-            id="cooking-mode"
-            value={cooking}
-            onChange={(e) => {
-              const v = pickOption(COOKING_OPTIONS, e.target.value);
-              if (v) setCooking(v);
-            }}
-          >
-            {COOKING_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="room-area">Room area (m²)</label>
-          <input
-            id="room-area"
-            type="number"
-            min="4"
-            max="200"
-            value={roomAreaM2}
-            onChange={(e) => setRoomAreaM2(e.target.value)}
-          />
-        </div>
-        <div>
-          <label htmlFor="purifier-cadr">Air purifier CADR (m³/h, optional)</label>
-          <input
-            id="purifier-cadr"
-            type="number"
-            min="10"
-            max="1000"
-            value={purifierCadr}
-            onChange={(e) => setPurifierCadr(e.target.value)}
-          />
-        </div>
+        <SelectField
+          id="heating-mode"
+          label="Heating"
+          value={heating}
+          options={HEATING_OPTIONS}
+          onChange={setHeating}
+        />
+        <SelectField
+          id="cooking-mode"
+          label="Cooking"
+          value={cooking}
+          options={COOKING_OPTIONS}
+          onChange={setCooking}
+        />
+        <NumberField
+          id="room-area"
+          label="Room area (m²)"
+          value={roomAreaM2}
+          min="4"
+          max="200"
+          onChange={setRoomAreaM2}
+        />
+        <NumberField
+          id="purifier-cadr"
+          label="Air purifier CADR (m³/h, optional)"
+          value={purifierCadr}
+          min="10"
+          max="1000"
+          onChange={setPurifierCadr}
+        />
       </fieldset>
 
       <div className="form-group checkbox-group">
@@ -322,7 +326,9 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
             checked={hasSensitiveMember}
             onChange={(e) => setHasSensitiveMember(e.target.checked)}
           />
-          Someone sensitive lives here
+          {mode === "community"
+            ? "Some residents are sensitive to air pollution"
+            : "Someone sensitive lives here"}
         </label>
       </div>
 

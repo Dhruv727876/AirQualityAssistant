@@ -84,14 +84,14 @@ export function App() {
     createPlan(profile, controller.signal)
       .then((createdPlan) => {
         if (!controller.signal.aborted) {
-          cancelPending();
+          clearTimeout(loadingTimerRef.current);
           setPlan(createdPlan);
           setRequestState({ status: "idle" });
         }
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          cancelPending();
+          clearTimeout(loadingTimerRef.current);
           setRequestState({ status: "error", message: messageFor(err) });
         }
       });

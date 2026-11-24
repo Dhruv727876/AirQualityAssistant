@@ -143,4 +143,34 @@ describe("ProfileForm", () => {
     expect(screen.getByLabelText("Adults")).toHaveProperty("value", "2");
     expect(screen.getByText("Selected location: Delhi")).toBeDefined();
   });
+
+  it("sensitive checkbox label matches the selected mode", () => {
+    const { unmount } = render(
+      <ProfileForm
+        mode="community"
+        initial={null}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    expect(
+      screen.getByLabelText("Some residents are sensitive to air pollution")
+    ).toBeDefined();
+
+    unmount();
+
+    render(
+      <ProfileForm
+        mode="family"
+        initial={null}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    expect(
+      screen.getByLabelText("Someone sensitive lives here")
+    ).toBeDefined();
+  });
 });
