@@ -1,0 +1,18 @@
+{
+  "name": "Urban Air Quality Assistant",
+  "short_name": "Air Plan",
+  "description": "Personalized air quality action plans for households and communities.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#005fcc",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
