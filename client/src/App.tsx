@@ -31,11 +31,18 @@ export function App() {
 
   const planControllerRef = useRef<AbortController | null>(null);
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const planRegionRef = useRef<HTMLDivElement | null>(null);
 
   const cancelPending = () => {
     planControllerRef.current?.abort();
     clearTimeout(loadingTimerRef.current);
   };
+
+  useEffect(() => {
+    if (plan) {
+      planRegionRef.current?.focus();
+    }
+  }, [plan]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,14 +113,22 @@ export function App() {
 
   return (
     <div>
+      <a href="#main" className="skip-link no-print">
+        Skip to main content
+      </a>
       <header>
         <h1>Urban Air Quality Assistant</h1>
       </header>
-      <main>
+      <main id="main">
         {serverStatus && <p role="status" className="no-print">{serverStatus}</p>}
 
         {plan ? (
-          <div>
+          <div
+            ref={planRegionRef}
+            role="region"
+            aria-label="Your air quality plan"
+            tabIndex={-1}
+          >
             <p className="print-only print-title">
               {lastProfile ? `Clean Air Plan for ${lastProfile.location.name}` : "Clean Air Plan"}
             </p>

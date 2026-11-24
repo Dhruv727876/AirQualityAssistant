@@ -83,6 +83,24 @@ form {
   display: none;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  left: 1rem;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  z-index: 1000;
+}
+
+[role="region"][tabindex="-1"] {
+  outline: none;
+}
+
 @media print {
   .no-print {
     display: none;

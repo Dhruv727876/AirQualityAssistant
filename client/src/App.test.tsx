@@ -227,4 +227,34 @@ describe("App", () => {
     fireEvent.click(printBtn);
     expect(printSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("renders skip to main content link targeting main", () => {
+    stubFetchRoutes({});
+    render(<App />);
+
+    const skipLink = screen.getByRole("link", { name: "Skip to main content" });
+    expect(skipLink).toBeDefined();
+    expect(skipLink.getAttribute("href")).toBe("#main");
+
+    const mainEl = screen.getByRole("main");
+    expect(mainEl.getAttribute("id")).toBe("main");
+  });
+
+  it("focuses the plan region when a plan is rendered", async () => {
+    stubFetchRoutes({
+      "/api/plan": () => jsonResponse(samplePlan),
+    });
+
+    localStorage.setItem("air_quality_profile", JSON.stringify(sampleProfile));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan for my family" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    const planRegion = await screen.findByRole("region", {
+      name: "Your air quality plan",
+    });
+    expect(document.activeElement).toBe(planRegion);
+  });
 });
