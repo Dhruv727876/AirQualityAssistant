@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { loadProfile, saveProfile, type Profile } from "./profile";
+import { loadProfile, saveProfile } from "./profile";
+import { sampleProfile } from "./testData";
 
 describe("profile", () => {
   beforeEach(() => {
@@ -9,29 +10,6 @@ describe("profile", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  const sampleProfile: Profile = {
-    mode: "family",
-    location: {
-      name: "Delhi",
-      latitude: 28.61,
-      longitude: 77.21,
-    },
-    commute: {
-      mode: "car",
-      oneWayKm: 10,
-      daysPerWeek: 5,
-    },
-    heating: "electric",
-    cooking: "gas",
-    roomAreaM2: 20,
-    hasSensitiveMember: true,
-    members: {
-      adults: 2,
-      children: 1,
-      elderly: 1,
-    },
-  };
 
   it("save then load round-trips", () => {
     saveProfile(sampleProfile);
