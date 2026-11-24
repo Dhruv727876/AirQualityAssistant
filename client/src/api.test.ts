@@ -127,4 +127,22 @@ describe("api", () => {
       })
     );
   });
+
+  it("non-JSON 200 response throws BAD_RESPONSE with Invalid JSON response", async () => {
+    stubFetch(new Response("<html>Not JSON</html>", { status: 200 }));
+
+    await expect(getHealth()).rejects.toMatchObject({
+      code: "BAD_RESPONSE",
+      message: "Invalid JSON response",
+    });
+  });
+
+  it("a fetch rejecting with non-Error maps to NETWORK with Network failure", async () => {
+    stubFetch(Promise.reject("offline"));
+
+    await expect(getHealth()).rejects.toMatchObject({
+      code: "NETWORK",
+      message: "Network failure",
+    });
+  });
 });

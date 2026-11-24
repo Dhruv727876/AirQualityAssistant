@@ -67,4 +67,38 @@ describe("PlanView", () => {
 
     expect(screen.getByText("Air quality: AQI Not available, PM2.5 Not available")).toBeDefined();
   });
+
+  it("renders verdict note, NVIDIA attribution, and impact source when present", () => {
+    const customPlan: Plan = {
+      ...samplePlan,
+      generatedBy: "nvidia",
+      verdict: {
+        level: "caution",
+        headline: "Air warning headline",
+        note: "Sensitive groups should wear masks.",
+      },
+      actions: [
+        {
+          id: "air-purifier",
+          title: "Run Purifier",
+          detail: "Run on high",
+          because: "High PM2.5",
+          impact: {
+            lever: "air-purifier",
+            value: 50,
+            unit: "%",
+            basis: "standard",
+            source: "EPA Indoor Air Study",
+            assumptions: ["Room is sealed"],
+          },
+        },
+      ],
+    };
+
+    render(<PlanView plan={customPlan} />);
+
+    expect(screen.getByText("Sensitive groups should wear masks.")).toBeDefined();
+    expect(screen.getByText("Wording by NVIDIA")).toBeDefined();
+    expect(screen.getByText(/— EPA Indoor Air Study/)).toBeDefined();
+  });
 });

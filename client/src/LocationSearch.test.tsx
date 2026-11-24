@@ -132,4 +132,39 @@ describe("LocationSearch", () => {
       expect(liveRegion?.textContent).toBe("1 place found.");
     });
   });
+
+  it("empty or whitespace query does not trigger search", () => {
+    const fetchMock = stubFetch(jsonResponse({ results: [] }));
+    render(<LocationSearch onSelect={vi.fn()} selected={null} />);
+
+    const input = screen.getByLabelText("Search location");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("pressing enter in search input triggers search", async () => {
+    const places = [
+      {
+        name: "Tokyo",
+        region: "Tokyo",
+        country: "Japan",
+        latitude: 35.6762,
+        longitude: 139.6503,
+      },
+    ];
+    stubFetch(jsonResponse({ results: places }));
+    render(<LocationSearch onSelect={vi.fn()} selected={null} />);
+
+    const input = screen.getByLabelText("Search location");
+    fireEvent.change(input, { target: { value: "Tokyo" } });
+    fireEvent.keyDown(input, { key: "Tab" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    const placeButton = await screen.findByRole("button", {
+      name: "Tokyo, Tokyo, Japan",
+    });
+    expect(placeButton).toBeDefined();
+  });
 });

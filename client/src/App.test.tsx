@@ -282,4 +282,30 @@ describe("App", () => {
     window.dispatchEvent(new Event("afterprint"));
     expect(details?.open).toBe(false);
   });
+
+  it("shows generic error message when request fails with non-network/rate-limit error", async () => {
+    stubFetchRoutes({
+      "/api/plan": () => new Response("Internal Server Error", { status: 500 }),
+    });
+
+    localStorage.setItem("air_quality_profile", JSON.stringify(sampleProfile));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan for my family" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    const alertEl = await screen.findByRole("alert");
+    expect(alertEl.textContent).toBe("Something went wrong. Please try again.");
+  });
+
+  it('"Plan for my community" button switches to community mode', async () => {
+    render(<App />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Plan for my community" }));
+    });
+    expect(
+      screen.getByText("This plan is for the whole community or building.")
+    ).toBeDefined();
+  });
 });

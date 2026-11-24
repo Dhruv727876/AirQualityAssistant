@@ -233,4 +233,69 @@ describe("ProfileForm", () => {
     expect(childrenInput.hasAttribute("aria-invalid")).toBe(false);
     expect(childrenInput.hasAttribute("aria-describedby")).toBe(false);
   });
+
+  it("changing select fields and toggling sensitive checkbox updates submitted profile", () => {
+    const handleSubmit = vi.fn();
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={handleSubmit}
+        submitting={false}
+      />
+    );
+
+    const commuteSelect = screen.getByLabelText("Commute mode");
+    fireEvent.change(commuteSelect, { target: { value: "public-transport" } });
+
+    const heatingSelect = screen.getByLabelText("Heating");
+    fireEvent.change(heatingSelect, { target: { value: "gas" } });
+
+    const cookingSelect = screen.getByLabelText("Cooking");
+    fireEvent.change(cookingSelect, { target: { value: "electric" } });
+
+    const sensitiveCheckbox = screen.getByLabelText("Someone sensitive lives here");
+    fireEvent.click(sensitiveCheckbox);
+
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(handleSubmit).toHaveBeenCalledWith({
+      ...sampleProfile,
+      commute: {
+        ...sampleProfile.commute,
+        mode: "public-transport",
+      },
+      heating: "gas",
+      cooking: "electric",
+      hasSensitiveMember: false,
+    });
+  });
+
+  it("submitting community form with invalid households shows error", () => {
+    const handleSubmit = vi.fn();
+    render(
+      <ProfileForm
+        mode="community"
+        initial={{
+          mode: "community",
+          location: { name: "City Center", latitude: 10, longitude: 20 },
+          commute: { mode: "car", oneWayKm: 5, daysPerWeek: 5 },
+          heating: "none",
+          cooking: "gas",
+          roomAreaM2: 25,
+          hasSensitiveMember: false,
+          households: 50,
+        }}
+        onSubmit={handleSubmit}
+        submitting={false}
+      />
+    );
+
+    const householdsInput = screen.getByLabelText("Households");
+    fireEvent.change(householdsInput, { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(handleSubmit).not.toHaveBeenCalled();
+    expect(householdsInput.getAttribute("aria-invalid")).toBe("true");
+  });
 });
