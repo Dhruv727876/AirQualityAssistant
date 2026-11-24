@@ -1,5 +1,12 @@
 # Urban Air Quality Assistant
 
+## Live demo
+
+- Client application: https://airqualityassistant-app.onrender.com
+- Backend server API: https://airqualityassistant.onrender.com
+
+The backend server runs on Render's free tier and sleeps after about 15 minutes idle. A cold start was measured at 12.8 s, and the client displays "Waking the server, this can take up to 15 seconds." after 2 s.
+
 ## What this is
 
 Urban Air Quality Assistant is a GenAI application designed to help families and communities navigate winter smog conditions. It provides tailored guidance on low-emission daily routines, indoor air quality practices, and sustainable alternatives suited to local contexts. Each recommendation transparently explains the direct environmental and health impacts of individual choices.
@@ -12,12 +19,22 @@ The project is structured as a two-tier monorepo with self-contained `client/` a
 /
   .gitignore
   README.md
+  render.yaml
   .github/workflows/ci.yml
   client/   (Vite + React + TypeScript)
   server/   (Express 5 + TypeScript)
 ```
 
-The application separates the frontend and backend into two decoupled tiers. This architecture ensures the static client assets load instantly in the user's browser even if the backend server is experiencing a cold start or asleep on serverless infrastructure.
+The application separates the frontend and backend into two decoupled tiers. The static client is served separately from the API, so the page loads while the free-tier server wakes; the client shows a waking message meanwhile.
+
+## Client
+
+- Built with React, TypeScript, and Vite.
+- Profile data is stored in `localStorage` only (no login, no database).
+- Family and community are separate flows; the community flow asks for a household count, multiplies only the commute impact by it, and always uses the sensitive-profile verdict thresholds.
+- Printable through a dedicated print stylesheet (no PDF library).
+- Accessibility features include a skip link and focus moves to the plan when it appears.
+- The client validates the server response with zod and shows an error instead of rendering malformed data.
 
 ## Data sources
 
@@ -81,6 +98,23 @@ Only the commute impact is multiplied by the number of households; every other f
 - **Latency & timeouts**: Responses are validated in full before display. The worst case is the air data call (5 s timeout) plus two 8-second provider timeouts, then the static plan.
 - **Trade-off on precision**: Rejecting digits means the wording can't include times or amounts, which is accepted so the numbers can only come from the server. The wording is checked for shape, length and digits, not for consistency with the verdict. The verdict and actions come from the server and stay the source of truth. Known limits: the wording is not checked against the plan or the household's real situation. In live testing some outputs advised keeping windows closed while cooking on gas, some suggested opening windows when the air was very unhealthy, and community wording read like household wording.
 
+## Design decisions and trade-offs
+
+- **The LLM never emits a number**: The server attaches a deterministic Impact computed from sourced coefficients; heating and cooking swaps show "Not quantified." Cost: fewer headline numbers.
+- **Fallback chain Gemini, then NVIDIA, then a static plan returned with HTTP 200, so the user always gets a plan**: If live APIs fail, the user is never left without guidance. Cost: worst-case latency of about 21 s (5 s air data plus two 8 s provider timeouts).
+- **Model choice was made by probing the live APIs, not from docs**: Several reasoning models returned empty content or timed out, and the NVIDIA call disables thinking with chat_template_kwargs. Tests mock providers and never call real APIs, so that failure class is covered only by the manual probes.
+- **No database or login**: Simpler and private (the profile is never logged). Cost: no share link and no cross-device profile.
+- **Air data is Open-Meteo modelled coarse-grid data, not a street-level sensor**: Open-Meteo CAMS data provides global reach without dedicated station infrastructure. Cost: coarse-grid data does not capture street-level or localized microclimate variations.
+- **The client re-declares the plan and profile schemas instead of sharing a package between client and server**: No workspace tooling in a two-package repo. Cost: the two copies can drift; the response parse in the client turns drift into a visible error.
+- **Express 5 for native async errors**: Express 5 natively handles rejected promises in route handlers and middleware without requiring wrapping try/catch blocks or third-party async-handler helpers.
+- **One AppError type with a code field instead of a class hierarchy**: A single `AppError` class with HTTP status, machine-readable `code`, and client message avoids deep class inheritance while standardizing the API error payload.
+- **Zod for env/request/LLM-output validation**: Zod validates all configuration at process startup, failing early with explicit lists of all missing or invalid variables, and provides a unified schema framework for subsequent request and LLM-response validation.
+- **Upstream bodies are zod-validated at the boundary and upstream errors are mapped to one 502 code**: External service boundaries are treated as untrusted; upstream schemas validate response structures immediately, and any network, timeout, or schema failure is mapped to a unified `UPSTREAM_ERROR` (502).
+- **The server never forwards upstream text**: Internal upstream error messages, raw network traces, and third-party error bodies are never relayed to clients, preventing information disclosure.
+- **Dedicated rate limit for /api/plan**: POST /api/plan has its own stricter rate limit (30 per 15 minutes per IP versus 100 for everything) because it is the endpoint that will call paid LLM APIs; both limits answer 429 in the standard error envelope.
+- **Health check exempt from rate limiting**: /api/health is exempt from rate limiting because platform health checks and uptime monitors poll it and it calls no upstream; every other route shares the general limit.
+- **Privacy for household profile data**: The household profile is personal data: it is validated strictly, never logged, never echoed back in error messages, and only held in the browser's localStorage.
+
 ## Run locally
 
 ### Server
@@ -102,6 +136,8 @@ Only the commute impact is multiplied by the number of households; every other f
    npm run dev
    ```
 
+The server's `ALLOWED_ORIGINS` must include the Vite dev origin (e.g. `http://localhost:5173`) or the browser will block requests.
+
 ### Client
 
 1. Navigate to the client directory:
@@ -121,6 +157,8 @@ Only the commute impact is multiplied by the number of households; every other f
    npm run dev
    ```
 
+The client reaches the server in development via `VITE_API_URL` configured in `client/.env`. The client Vite configuration does not include a reverse proxy.
+
 ## Environment variables
 
 ### Server (`server/.env`)
@@ -136,16 +174,19 @@ Only the commute impact is multiplied by the number of households; every other f
 
 | Variable | Description | Required | Default |
 | --- | --- | --- | --- |
-| `VITE_API_URL` | Base URL of the backend server API | No | `http://localhost:8080` |
+| `VITE_API_URL` | Base URL of the server API; if unset, requests go to the page's own origin, which does not reach the server in dev because there is no Vite proxy (e.g. `http://localhost:8080`) | Yes for local dev and for any deploy | none |
 
-## Decisions & trade-offs
+## Deploy
 
-- **Express 5 for native async errors**: Express 5 natively handles rejected promises in route handlers and middleware without requiring wrapping try/catch blocks or third-party async-handler helpers.
-- **One AppError type with a code field instead of a class hierarchy**: A single `AppError` class with HTTP status, machine-readable `code`, and client message avoids deep class inheritance while standardizing the API error payload.
-- **Zod for env/request/LLM-output validation**: Zod validates all configuration at process startup, failing early with explicit lists of all missing or invalid variables, and provides a unified schema framework for subsequent request and LLM-response validation.
-- **No database in v1 - profile state stays in localStorage**: Eliminates operational overhead and external state dependencies for the initial baseline while keeping user profiles local, private, and immediately responsive.
-- **Upstream bodies are zod-validated at the boundary and upstream errors are mapped to one 502 code**: External service boundaries are treated as untrusted; upstream schemas validate response structures immediately, and any network, timeout, or schema failure is mapped to a unified `UPSTREAM_ERROR` (502).
-- **The server never forwards upstream text**: Internal upstream error messages, raw network traces, and third-party error bodies are never relayed to clients, preventing information disclosure.
-- **Dedicated rate limit for /api/plan**: POST /api/plan has its own stricter rate limit (30 per 15 minutes per IP versus 100 for everything) because it is the endpoint that will call paid LLM APIs; both limits answer 429 in the standard error envelope.
-- **Health check exempt from rate limiting**: /api/health is exempt from rate limiting because platform health checks and uptime monitors poll it and it calls no upstream; every other route shares the general limit.
-- **Privacy for household profile data**: The household profile is personal data: it is validated strictly, never logged, never echoed back in error messages, and only held in the browser's localStorage.
+- **Server**: Configured as a Render Web Service in the Render dashboard:
+  - Root Directory: `server`
+  - Build Command: `npm ci --include=dev && npm run build`
+  - Start Command: `npm start`
+  - Health Check Path: `/api/health`
+  - Environment variables (`GEMINI_API_KEY`, `NVIDIA_API_KEY`, `ALLOWED_ORIGINS`) are set in the Render dashboard only. `ALLOWED_ORIGINS` on the server must equal the client's exact origin (no trailing slash or path), e.g. https://airqualityassistant-app.onrender.com.
+- **Client**: Configured as a Render Static Site declared in `render.yaml`:
+  - Root Directory: `client`
+  - Build Command: `npm ci && npm run build`
+  - Static Publish Path: `dist`
+  - Environment variable `VITE_API_URL` points to https://airqualityassistant.onrender.com (set in the dashboard).
+  - Security headers are declared in `render.yaml` with Content-Security-Policy, where `connect-src` must list the server origin https://airqualityassistant.onrender.com, alongside `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and `X-Frame-Options: DENY`.
