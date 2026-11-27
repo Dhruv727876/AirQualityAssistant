@@ -19,6 +19,43 @@ function makeJsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function makeGeocodeBody() {
+  return {
+    results: [
+      {
+        id: 1,
+        name: "Delhi",
+        latitude: 28.65,
+        longitude: 77.23,
+      },
+    ],
+  };
+}
+
+function makeAirBody() {
+  const times: string[] = [];
+  const aqiList: number[] = [];
+  const pm25List: number[] = [];
+  for (let i = 0; i < 30; i++) {
+    times.push(`2026-01-01T${String(i % 24).padStart(2, "0")}:00`);
+    aqiList.push(50);
+    pm25List.push(20);
+  }
+  return {
+    current: {
+      time: "2026-01-01T10:00",
+      us_aqi: 55,
+      pm2_5: 22,
+      pm10: 40,
+    },
+    hourly: {
+      time: times,
+      us_aqi: aqiList,
+      pm2_5: pm25List,
+    },
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -344,18 +381,7 @@ describe("Upstream failure handling", () => {
   it("geocode success has cache-control exactly public, max-age=3600", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        makeJsonResponse({
-          results: [
-            {
-              id: 1,
-              name: "Delhi",
-              latitude: 28.65,
-              longitude: 77.23,
-            },
-          ],
-        })
-      )
+      vi.fn().mockResolvedValue(makeJsonResponse(makeGeocodeBody()))
     );
 
     const app = createApp(testConfig);
@@ -366,32 +392,9 @@ describe("Upstream failure handling", () => {
   });
 
   it("air success has cache-control exactly public, max-age=300", async () => {
-    const times: string[] = [];
-    const aqiList: number[] = [];
-    const pm25List: number[] = [];
-    for (let i = 0; i < 30; i++) {
-      times.push(`2026-01-01T${String(i % 24).padStart(2, "0")}:00`);
-      aqiList.push(50);
-      pm25List.push(20);
-    }
-
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        makeJsonResponse({
-          current: {
-            time: "2026-01-01T10:00",
-            us_aqi: 55,
-            pm2_5: 22,
-            pm10: 40,
-          },
-          hourly: {
-            time: times,
-            us_aqi: aqiList,
-            pm2_5: pm25List,
-          },
-        })
-      )
+      vi.fn().mockResolvedValue(makeJsonResponse(makeAirBody()))
     );
 
     const app = createApp(testConfig);
@@ -410,18 +413,7 @@ describe("Upstream failure handling", () => {
   });
 
   it("two identical GET /api/geocode requests call fetch once", async () => {
-    const mockFetch = vi.fn().mockResolvedValue(
-      makeJsonResponse({
-        results: [
-          {
-            id: 1,
-            name: "Delhi",
-            latitude: 28.65,
-            longitude: 77.23,
-          },
-        ],
-      })
-    );
+    const mockFetch = vi.fn().mockResolvedValue(makeJsonResponse(makeGeocodeBody()));
     vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);
@@ -435,30 +427,7 @@ describe("Upstream failure handling", () => {
   });
 
   it("two identical GET /api/air requests call fetch once", async () => {
-    const times: string[] = [];
-    const aqiList: number[] = [];
-    const pm25List: number[] = [];
-    for (let i = 0; i < 30; i++) {
-      times.push(`2026-01-01T${String(i % 24).padStart(2, "0")}:00`);
-      aqiList.push(50);
-      pm25List.push(20);
-    }
-
-    const mockFetch = vi.fn().mockResolvedValue(
-      makeJsonResponse({
-        current: {
-          time: "2026-01-01T10:00",
-          us_aqi: 55,
-          pm2_5: 22,
-          pm10: 40,
-        },
-        hourly: {
-          time: times,
-          us_aqi: aqiList,
-          pm2_5: pm25List,
-        },
-      })
-    );
+    const mockFetch = vi.fn().mockResolvedValue(makeJsonResponse(makeAirBody()));
     vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);
@@ -471,23 +440,12 @@ describe("Upstream failure handling", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("a failed upstream call is not cached: first fetch mock returns a 500, the second returns success, and the second request returns 200 (fetch called twice)", async () => {
+  it("does not cache a failed upstream call", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce(new Response("Internal Server Error", { status: 500 }))
-      .mockResolvedValueOnce(
-        makeJsonResponse({
-          results: [
-            {
-              id: 1,
-              name: "Delhi",
-              latitude: 28.65,
-              longitude: 77.23,
-            },
-          ],
-        })
-      );
+      .mockResolvedValueOnce(makeJsonResponse(makeGeocodeBody()));
     vi.stubGlobal("fetch", mockFetch);
 
     const app = createApp(testConfig);

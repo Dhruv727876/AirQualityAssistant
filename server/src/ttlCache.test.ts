@@ -8,7 +8,6 @@ describe("createTtlCache", () => {
 
   it("returns undefined for a missing key", () => {
     const cache = createTtlCache<string>(1000, 10);
-    cache.clear();
     expect(cache.get("non-existent")).toBeUndefined();
   });
 
