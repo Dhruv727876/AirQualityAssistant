@@ -83,34 +83,43 @@ function verdictFor(
   sensitive: boolean,
   isCommunity: boolean
 ): Verdict {
-  let level: VerdictLevel;
+  const note = sensitive
+    ? isCommunity
+      ? "This plan treats the community as including sensitive groups, so the thresholds are stricter."
+      : "Your household includes children, older adults or someone sensitive to air pollution, so the thresholds are stricter."
+    : null;
 
   if (usAqi === null) {
-    level = "unknown";
-  } else {
-    const thresholds = sensitive
-      ? VERDICT_THRESHOLDS.sensitive
-      : VERDICT_THRESHOLDS.general;
-
-    if (usAqi <= thresholds.go) {
-      level = "go";
-    } else if (usAqi <= thresholds.caution) {
-      level = "caution";
-    } else {
-      level = "limit-outdoors";
-    }
+    return {
+      level: "unknown",
+      headline: HEADLINES.unknown,
+      note,
+    };
   }
 
-  let note: string | null = null;
-  if (sensitive) {
-    note = isCommunity
-      ? "This plan treats the community as including sensitive groups, so the thresholds are stricter."
-      : "Your household includes children, older adults or someone sensitive to air pollution, so the thresholds are stricter.";
+  const thresholds = sensitive
+    ? VERDICT_THRESHOLDS.sensitive
+    : VERDICT_THRESHOLDS.general;
+
+  if (usAqi <= thresholds.go) {
+    return {
+      level: "go",
+      headline: HEADLINES.go,
+      note,
+    };
+  }
+
+  if (usAqi <= thresholds.caution) {
+    return {
+      level: "caution",
+      headline: HEADLINES.caution,
+      note,
+    };
   }
 
   return {
-    level,
-    headline: HEADLINES[level],
+    level: "limit-outdoors",
+    headline: HEADLINES["limit-outdoors"],
     note,
   };
 }

@@ -32,7 +32,7 @@ export const samplePlan: Plan = {
       { period: "morning", advice: "Keep windows closed during peak morning traffic." },
     ],
     tips: [
-      { title: "Indoor Plants", detail: "Plants do not replace ventilation or air purifiers." },
+      { title: "Air Purifier", detail: "Run an air purifier in main rooms to lower particulate concentrations." },
     ],
   },
   air: {
