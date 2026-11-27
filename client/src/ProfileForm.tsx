@@ -13,6 +13,8 @@ type CommuteMode = Profile["commute"]["mode"];
 type Heating = Profile["heating"];
 type Cooking = Profile["cooking"];
 
+const ERROR_ID = "form-error";
+
 const PATH_TO_ID: Record<string, string> = {
   "members.adults": "family-adults",
   "members.children": "family-children",
@@ -25,7 +27,6 @@ const PATH_TO_ID: Record<string, string> = {
   cooking: "cooking-mode",
   roomAreaM2: "room-area",
   purifierCadrM3PerHour: "purifier-cadr",
-  hasSensitiveMember: "sensitive-member",
 };
 
 const COMMUTE_OPTIONS: readonly { value: CommuteMode; label: string }[] = [
@@ -57,7 +58,6 @@ interface NumberFieldProps {
   max: string;
   onChange: (value: string) => void;
   isInvalid?: boolean;
-  describedBy?: string;
 }
 
 function NumberField({
@@ -68,7 +68,6 @@ function NumberField({
   max,
   onChange,
   isInvalid,
-  describedBy,
 }: NumberFieldProps) {
   return (
     <div>
@@ -81,7 +80,7 @@ function NumberField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={isInvalid ? "true" : undefined}
-        aria-describedby={isInvalid ? describedBy : undefined}
+        aria-describedby={isInvalid ? ERROR_ID : undefined}
       />
     </div>
   );
@@ -94,7 +93,6 @@ interface SelectFieldProps<T extends string> {
   options: readonly { value: T; label: string }[];
   onChange: (v: T) => void;
   isInvalid?: boolean;
-  describedBy?: string;
 }
 
 function SelectField<T extends string>({
@@ -104,7 +102,6 @@ function SelectField<T extends string>({
   options,
   onChange,
   isInvalid,
-  describedBy,
 }: SelectFieldProps<T>) {
   return (
     <div>
@@ -119,7 +116,7 @@ function SelectField<T extends string>({
           }
         }}
         aria-invalid={isInvalid ? "true" : undefined}
-        aria-describedby={isInvalid ? describedBy : undefined}
+        aria-describedby={isInvalid ? ERROR_ID : undefined}
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -181,8 +178,9 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
 
   const [alertError, setAlertError] = useState<string | null>(null);
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const isInvalid = (id: string) => invalidFields.includes(id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!location) {
       setAlertError("Choose a location first.");
@@ -239,14 +237,9 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
       setInvalidFields(invalidIds);
       setAlertError(issuePaths.length > 0 ? `Invalid fields: ${issuePaths.join(", ")}` : "Invalid input");
 
-      if (e.currentTarget instanceof HTMLFormElement) {
-        const invalidSet = new Set(invalidIds);
-        for (const element of e.currentTarget.elements) {
-          if (element instanceof HTMLElement && invalidSet.has(element.id)) {
-            element.focus();
-            break;
-          }
-        }
+      if (invalidIds.length > 0) {
+        const selector = invalidIds.map((id) => `#${id}`).join(", ");
+        e.currentTarget.querySelector<HTMLElement>(selector)?.focus();
       }
       return;
     }
@@ -257,14 +250,19 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
   };
 
   return (
-    <form onSubmit={handleSubmit} className="profile-form" noValidate>
+    <form
+      onSubmit={handleSubmit}
+      onChange={() => setInvalidFields([])}
+      className="profile-form"
+      noValidate
+    >
       {mode === "community" ? (
         <p>This plan is for the whole community or building.</p>
       ) : (
         <p>This plan is for your household.</p>
       )}
 
-      {alertError && <p role="alert" id="form-error">{alertError}</p>}
+      {alertError && <p role="alert" id={ERROR_ID}>{alertError}</p>}
 
       <fieldset className="form-group">
         <legend>Location</legend>
@@ -281,8 +279,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
             min="1"
             max="10"
             onChange={setAdults}
-            isInvalid={invalidFields.includes("family-adults")}
-            describedBy="form-error"
+            isInvalid={isInvalid("family-adults")}
           />
           <NumberField
             id="family-children"
@@ -291,8 +288,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
             min="0"
             max="10"
             onChange={setChildren}
-            isInvalid={invalidFields.includes("family-children")}
-            describedBy="form-error"
+            isInvalid={isInvalid("family-children")}
           />
           <NumberField
             id="family-elderly"
@@ -301,8 +297,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
             min="0"
             max="10"
             onChange={setElderly}
-            isInvalid={invalidFields.includes("family-elderly")}
-            describedBy="form-error"
+            isInvalid={isInvalid("family-elderly")}
           />
         </fieldset>
       ) : (
@@ -314,8 +309,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
             min="2"
             max="10000"
             onChange={setHouseholds}
-            isInvalid={invalidFields.includes("community-households")}
-            describedBy="form-error"
+            isInvalid={isInvalid("community-households")}
           />
         </div>
       )}
@@ -328,8 +322,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           value={commuteMode}
           options={COMMUTE_OPTIONS}
           onChange={setCommuteMode}
-          isInvalid={invalidFields.includes("commute-mode")}
-          describedBy="form-error"
+          isInvalid={isInvalid("commute-mode")}
         />
         <NumberField
           id="commute-km"
@@ -338,8 +331,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           min="0"
           max="200"
           onChange={setOneWayKm}
-          isInvalid={invalidFields.includes("commute-km")}
-          describedBy="form-error"
+          isInvalid={isInvalid("commute-km")}
         />
         <NumberField
           id="commute-days"
@@ -348,8 +340,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           min="0"
           max="7"
           onChange={setDaysPerWeek}
-          isInvalid={invalidFields.includes("commute-days")}
-          describedBy="form-error"
+          isInvalid={isInvalid("commute-days")}
         />
       </fieldset>
 
@@ -361,8 +352,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           value={heating}
           options={HEATING_OPTIONS}
           onChange={setHeating}
-          isInvalid={invalidFields.includes("heating-mode")}
-          describedBy="form-error"
+          isInvalid={isInvalid("heating-mode")}
         />
         <SelectField
           id="cooking-mode"
@@ -370,8 +360,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           value={cooking}
           options={COOKING_OPTIONS}
           onChange={setCooking}
-          isInvalid={invalidFields.includes("cooking-mode")}
-          describedBy="form-error"
+          isInvalid={isInvalid("cooking-mode")}
         />
         <NumberField
           id="room-area"
@@ -380,8 +369,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           min="4"
           max="200"
           onChange={setRoomAreaM2}
-          isInvalid={invalidFields.includes("room-area")}
-          describedBy="form-error"
+          isInvalid={isInvalid("room-area")}
         />
         <NumberField
           id="purifier-cadr"
@@ -390,8 +378,7 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
           min="10"
           max="1000"
           onChange={setPurifierCadr}
-          isInvalid={invalidFields.includes("purifier-cadr")}
-          describedBy="form-error"
+          isInvalid={isInvalid("purifier-cadr")}
         />
       </fieldset>
 
@@ -402,8 +389,6 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
             type="checkbox"
             checked={hasSensitiveMember}
             onChange={(e) => setHasSensitiveMember(e.target.checked)}
-            aria-invalid={invalidFields.includes("sensitive-member") ? "true" : undefined}
-            aria-describedby={invalidFields.includes("sensitive-member") ? "form-error" : undefined}
           />
           {mode === "community"
             ? "Some residents are sensitive to air pollution"

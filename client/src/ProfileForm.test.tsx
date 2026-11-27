@@ -298,4 +298,24 @@ describe("ProfileForm", () => {
     expect(handleSubmit).not.toHaveBeenCalled();
     expect(householdsInput.getAttribute("aria-invalid")).toBe("true");
   });
+
+  it("after a failed submit sets aria-invalid on Adults, changing the Adults input removes the aria-invalid attribute", () => {
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    const adultsInput = screen.getByLabelText("Adults");
+    fireEvent.change(adultsInput, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(adultsInput.getAttribute("aria-invalid")).toBe("true");
+
+    fireEvent.change(adultsInput, { target: { value: "2" } });
+    expect(adultsInput.hasAttribute("aria-invalid")).toBe(false);
+  });
 });
