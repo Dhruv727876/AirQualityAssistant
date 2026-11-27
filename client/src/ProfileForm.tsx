@@ -235,7 +235,14 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
         }
       }
       setInvalidFields(invalidIds);
-      setAlertError(issuePaths.length > 0 ? `Invalid fields: ${issuePaths.join(", ")}` : "Invalid input");
+      const labels = issuePaths.map((path) => {
+        const id = PATH_TO_ID[path];
+        const labelText = id
+          ? e.currentTarget.querySelector(`label[for="${id}"]`)?.textContent
+          : null;
+        return labelText || path;
+      });
+      setAlertError(labels.length > 0 ? `Invalid fields: ${labels.join(", ")}` : "Invalid input");
 
       if (invalidIds.length > 0) {
         const selector = invalidIds.map((id) => `#${id}`).join(", ");
@@ -252,7 +259,10 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
   return (
     <form
       onSubmit={handleSubmit}
-      onChange={() => setInvalidFields([])}
+      onChange={() => {
+        setInvalidFields([]);
+        setAlertError(null);
+      }}
       className="profile-form"
       noValidate
     >

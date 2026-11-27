@@ -40,7 +40,7 @@ describe("ProfileForm", () => {
 
     expect(handleSubmit).not.toHaveBeenCalled();
     const alert = screen.getByRole("alert");
-    expect(alert.textContent).toBe("Invalid fields: members.adults");
+    expect(alert.textContent).toBe("Invalid fields: Adults");
   });
 
   it("submitting with CADR calls onSubmit with purifierCadrM3PerHour", () => {
@@ -194,7 +194,7 @@ describe("ProfileForm", () => {
 
     const alert = screen.getByRole("alert");
     expect(alert.id).toBe("form-error");
-    expect(alert.textContent).toContain("Invalid fields: members.adults");
+    expect(alert.textContent).toContain("Invalid fields: Adults");
   });
 
   it("failed submit moves focus to the first invalid field", () => {
@@ -317,5 +317,49 @@ describe("ProfileForm", () => {
 
     fireEvent.change(adultsInput, { target: { value: "2" } });
     expect(adultsInput.hasAttribute("aria-invalid")).toBe(false);
+  });
+
+  it("shows visible labels for multiple invalid fields without schema paths", () => {
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    const adultsInput = screen.getByLabelText("Adults");
+    const kmInput = screen.getByLabelText("One-way distance (km)");
+
+    fireEvent.change(adultsInput, { target: { value: "0" } });
+    fireEvent.change(kmInput, { target: { value: "-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Adults");
+    expect(alert.textContent).toContain("One-way distance (km)");
+    expect(alert.textContent).not.toContain("members.");
+    expect(alert.textContent).not.toContain("commute.");
+  });
+
+  it("editing an input clears the validation alert from the DOM", () => {
+    render(
+      <ProfileForm
+        mode="family"
+        initial={sampleProfile}
+        onSubmit={vi.fn()}
+        submitting={false}
+      />
+    );
+
+    const adultsInput = screen.getByLabelText("Adults");
+    fireEvent.change(adultsInput, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Get air quality plan" }));
+
+    expect(screen.getByRole("alert")).toBeDefined();
+
+    fireEvent.change(adultsInput, { target: { value: "2" } });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
