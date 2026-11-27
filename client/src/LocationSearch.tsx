@@ -13,6 +13,16 @@ function formatPlaceLabel(place: GeocodePlace): string {
   return [place.name, place.region, place.country].filter(Boolean).join(", ");
 }
 
+function resultsMessage(count: number): string {
+  if (count === 0) {
+    return "";
+  }
+  if (count === 1) {
+    return "1 place found.";
+  }
+  return `${count} places found.`;
+}
+
 export function LocationSearch({ onSelect, selected }: LocationSearchProps) {
   const [query, setQuery] = useState("");
   const [places, setPlaces] = useState<GeocodePlace[]>([]);
@@ -64,12 +74,7 @@ export function LocationSearch({ onSelect, selected }: LocationSearchProps) {
     onSelect(selectedPlace);
   };
 
-  const message =
-    places.length === 0
-      ? ""
-      : places.length === 1
-        ? "1 place found."
-        : `${places.length} places found.`;
+  const message = resultsMessage(places.length);
 
   return (
     <div className="location-search">

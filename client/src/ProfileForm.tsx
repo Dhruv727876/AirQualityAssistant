@@ -228,20 +228,18 @@ export function ProfileForm({ mode, initial, onSubmit, submitting }: ProfileForm
         new Set(parseResult.error.issues.map((issue) => issue.path.join(".")).filter(Boolean))
       );
       const invalidIds: string[] = [];
+      const labels: string[] = [];
       for (const path of issuePaths) {
         const id = PATH_TO_ID[path];
         if (id) {
           invalidIds.push(id);
         }
-      }
-      setInvalidFields(invalidIds);
-      const labels = issuePaths.map((path) => {
-        const id = PATH_TO_ID[path];
         const labelText = id
           ? e.currentTarget.querySelector(`label[for="${id}"]`)?.textContent
           : null;
-        return labelText || path;
-      });
+        labels.push(labelText || path);
+      }
+      setInvalidFields(invalidIds);
       setAlertError(labels.length > 0 ? `Invalid fields: ${labels.join(", ")}` : "Invalid input");
 
       if (invalidIds.length > 0) {

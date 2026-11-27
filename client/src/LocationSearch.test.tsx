@@ -3,6 +3,22 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { LocationSearch } from "./LocationSearch";
 import { jsonResponse, stubFetch } from "./testUtils";
 
+function makeBerlinPlace() {
+  return {
+    name: "Berlin",
+    region: "Berlin",
+    country: "Germany",
+    latitude: 52.52,
+    longitude: 13.405,
+  };
+}
+
+function searchBerlin() {
+  const input = screen.getByLabelText("Search location");
+  fireEvent.change(input, { target: { value: "Berlin" } });
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+}
+
 describe("LocationSearch", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -74,13 +90,7 @@ describe("LocationSearch", () => {
 
   it("announces the result count in an aria-live region that exists before the search", async () => {
     const places = [
-      {
-        name: "Berlin",
-        region: "Berlin",
-        country: "Germany",
-        latitude: 52.52,
-        longitude: 13.405,
-      },
+      makeBerlinPlace(),
       {
         name: "Berlin",
         region: "Connecticut",
@@ -97,9 +107,7 @@ describe("LocationSearch", () => {
     expect(liveRegion).not.toBeNull();
     expect(liveRegion?.textContent).toBe("");
 
-    const input = screen.getByLabelText("Search location");
-    fireEvent.change(input, { target: { value: "Berlin" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    searchBerlin();
 
     await waitFor(() => {
       expect(liveRegion?.textContent).toBe("2 places found.");
@@ -107,15 +115,7 @@ describe("LocationSearch", () => {
   });
 
   it("with one place returned, the same element reads '1 place found.'", async () => {
-    const places = [
-      {
-        name: "Berlin",
-        region: "Berlin",
-        country: "Germany",
-        latitude: 52.52,
-        longitude: 13.405,
-      },
-    ];
+    const places = [makeBerlinPlace()];
     stubFetch(jsonResponse({ results: places }));
 
     const { container } = render(<LocationSearch onSelect={vi.fn()} selected={null} />);
@@ -124,9 +124,7 @@ describe("LocationSearch", () => {
     expect(liveRegion).not.toBeNull();
     expect(liveRegion?.textContent).toBe("");
 
-    const input = screen.getByLabelText("Search location");
-    fireEvent.change(input, { target: { value: "Berlin" } });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    searchBerlin();
 
     await waitFor(() => {
       expect(liveRegion?.textContent).toBe("1 place found.");

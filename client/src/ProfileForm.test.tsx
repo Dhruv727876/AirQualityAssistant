@@ -299,7 +299,7 @@ describe("ProfileForm", () => {
     expect(householdsInput.getAttribute("aria-invalid")).toBe("true");
   });
 
-  it("after a failed submit sets aria-invalid on Adults, changing the Adults input removes the aria-invalid attribute", () => {
+  it("clears aria-invalid on Adults when the input changes", () => {
     render(
       <ProfileForm
         mode="family"
